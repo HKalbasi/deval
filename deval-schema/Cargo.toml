@@ -1,0 +1,10 @@
+[package]
+name = "deval-schema"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+deval-data-model = { version = "0.1.0", path = "../deval-data-model" }
+deval-schema-ast = { version = "0.1.0", path = "../deval-schema-ast" }
+deval-schema-parser = { version = "0.1.0", path = "../deval-schema-parser" }
+deval-validator = { version = "0.1.0", path = "../deval-validator" }

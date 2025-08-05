@@ -1,14 +1,21 @@
-pub fn add(left: u64, right: u64) -> u64 {
-    left + right
+use std::ops::Range;
+
+#[derive(Debug)]
+pub struct Spanned<T> {
+    pub value: T,
+    pub span: Range<usize>,
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+#[derive(Debug)]
+pub struct RecordMatcher {
+    pub key: String,
+    pub docs: String,
+    pub value: DataMatcher,
+}
 
-    #[test]
-    fn it_works() {
-        let result = add(2, 2);
-        assert_eq!(result, 4);
-    }
+#[derive(Debug)]
+pub enum DataMatcher {
+    Ident(Spanned<String>),
+    Array { element: Box<DataMatcher> },
+    Object(Vec<RecordMatcher>),
 }

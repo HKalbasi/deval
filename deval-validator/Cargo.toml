@@ -5,3 +5,4 @@ edition = "2024"
 
 [dependencies]
 deval-data-model = { version = "0.1.0", path = "../deval-data-model" }
+dyn-clone = "1.0.20"

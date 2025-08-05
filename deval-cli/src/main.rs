@@ -1,5 +1,5 @@
-use ariadne::{Label, Report, ReportKind, Source};
-use deval_validator::{ArrayValidator, NumberValidator, ObjectValidator, ValidationError, ValidationResult, Validator};
+use ariadne::{Color, Config, Fmt, Label, Report, ReportKind, Source};
+use deval_validator::ValidationError;
 use std::ops::Range;
 use tree_sitter::{Node, Parser};
 
@@ -97,7 +97,7 @@ fn parse_value(
                         let value_node = child
                             .child_by_field_name("value")
                             .or_else(|| child.named_child(1))?;
-                        let key = parse_string_value(&key_node, source, filename, errors)?;
+                        let key = parse_string_value(&key_node, source, errors)?;
                         let value = parse_value(&value_node, source, filename, errors)?;
                         pairs.push((
                             Spanned {
@@ -141,7 +141,6 @@ fn parse_value(
 fn parse_string_value(
     node: &Node,
     source: &str,
-    filename: &str,
     errors: &mut Vec<(String, Range<usize>)>,
 ) -> Option<String> {
     if node.kind() != "string" {
@@ -195,43 +194,90 @@ fn report_errors(filename: &str, source: &str, errors: &[(String, Range<usize>)]
     }
 }
 
-fn main() {
-    let filename = "example.json";
-    let source = r#"
-    {
-        "name": "John Doe",
-        "age": 30,
-        "is_student": false,
-        "address": {
-            "street": "123 Main St",
-            "city": "Anytown"
-        },
-        "hobbies": ["reading", "swimming"]
-    }
-    "#;
+// Enhanced error reporting with Ariadne
+fn display_errors(src: &str, errors: Vec<deval_schema::Error<'_>>) {
+    let source_id = "schema";
+    let config = Config::default().with_color(true);
 
-    match parse_json_with_spans(filename, source) {
-        Ok(data) => {
-            println!("Parsed successfully: {:#?}", data);
-            let validator = ObjectValidator(vec![
-                ("name".to_owned(), Box::new(NumberValidator)),
-                ("hobbies".to_owned(), Box::new(ArrayValidator(Box::new(NumberValidator)))),
-                ("address".to_owned(), Box::new(ObjectValidator(vec![]))),
-            ]);
-            let r = validator.validate(Spanned {
-                value: data,
-                span: Span {
-                    filename: "()".to_string(),
-                    start: 0,
-                    end: 1,
-                },
-            });
-            println!("Parsed successfully: {:#?}", r.result);
-            report_validation_errors(source, &r.errors);
+    for error in errors {
+        let span = error.span();
+        let reason = error.reason();
+        let found = error
+            .found()
+            .map(|c| format!("'{}'", c))
+            .unwrap_or_else(|| "end of input".to_string());
+        let expected = error.expected().map(|s| s.to_string()).collect::<Vec<_>>();
+
+        let mut report = Report::build(ReportKind::Error, (source_id, span.into_range()))
+            .with_config(config.clone())
+            .with_message(format!("{}: {}", reason, found.fg(Color::Red)))
+            .with_label(
+                Label::new((source_id, span.into_range()))
+                    .with_message(reason)
+                    .with_color(Color::Red),
+            );
+
+        if !expected.is_empty() {
+            let expected_list = expected.join(", ");
+            report = report.with_note(format!(
+                "Expected one of: {}",
+                expected_list.fg(Color::Green)
+            ));
         }
-        Err(errors) => {
-            eprintln!("Failed to parse JSON:");
-            report_errors(filename, source, &errors);
+
+        // if let Some(while_parsing) = error.context() {
+        //     report = report.with_note(format!("While parsing: {}", while_parsing.fg(Color::Cyan)));
+        // }
+
+        report
+            .finish()
+            .eprint((source_id, Source::from(src)))
+            .unwrap();
+    }
+}
+
+#[derive(clap::Parser)]
+enum Args {
+    Check {
+        #[arg(short, long)]
+        schema: String,
+        #[arg(short, long)]
+        file: String,
+    },
+}
+
+fn main() {
+    use clap::Parser;
+    let args = Args::parse();
+
+    match args {
+        Args::Check { schema, file } => {
+            let schema_source = std::fs::read_to_string(&schema).unwrap();
+            let source = std::fs::read_to_string(&file).unwrap();
+            match parse_json_with_spans(&file, &source) {
+                Ok(data) => {
+                    let validator = match deval_schema::compile(&schema_source) {
+                        Ok(v) => v,
+                        Err(e) => {
+                            display_errors(&schema_source, e);
+                            return;
+                        }
+                    };
+                    let r = validator.validate(Spanned {
+                        value: data,
+                        span: Span {
+                            filename: "()".to_string(),
+                            start: 0,
+                            end: 1,
+                        },
+                    });
+                    report_validation_errors(&source, &r.errors);
+                }
+                Err(errors) => {
+                    eprintln!("Failed to parse JSON:");
+                    report_errors(&file, &source, &errors);
+                }
+            }
         }
     }
 }

@@ -1,0 +1,11 @@
+{
+    name: string,
+    /// Years since birthday
+    age: number,
+    is_student: bool,
+    address: {
+        street: string,
+        city: string,
+    },
+    hobbies: string[],
+}

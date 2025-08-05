@@ -7,13 +7,13 @@ pub struct Span {
     pub end: usize,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Spanned<T> {
     pub value: T,
     pub span: Span,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum SpannedData {
     Null,
     Bool(Spanned<bool>),

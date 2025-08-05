@@ -1,4 +1,5 @@
 use deval_data_model::{Annotated, AnnotatedData, Span, Spanned, SpannedData};
+use dyn_clone::DynClone;
 
 pub struct ValidationError {
     pub span: Span,
@@ -27,10 +28,13 @@ impl ValidationResult {
     }
 }
 
-pub trait Validator {
+pub trait Validator: std::fmt::Debug + DynClone {
     fn validate(&self, data: Spanned<SpannedData>) -> ValidationResult;
 }
 
+dyn_clone::clone_trait_object!(Validator);
+
+#[derive(Debug, Clone, Copy)]
 pub struct AnyValidator;
 
 impl Validator for AnyValidator {
@@ -39,6 +43,30 @@ impl Validator for AnyValidator {
     }
 }
 
+#[derive(Clone)]
+pub struct LambdaValidator<T: Clone + Fn(Spanned<SpannedData>) -> Option<String>>(pub T);
+
+impl<T: Clone + Fn(Spanned<SpannedData>) -> Option<String>> std::fmt::Debug for LambdaValidator<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("LambdaValidator").finish()
+    }
+}
+
+impl<T: Clone + Fn(Spanned<SpannedData>) -> Option<String>> Validator for LambdaValidator<T> {
+    fn validate(&self, data: Spanned<SpannedData>) -> ValidationResult {
+        let span = data.span.clone();
+        if let Some(text) = self.0(data.clone()) {
+            return ValidationResult {
+                errors: vec![ValidationError { span, text }],
+                result: data.into(),
+            };
+        } else {
+            ValidationResult::ok(data.into())
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
 pub struct NumberValidator;
 
 impl Validator for NumberValidator {
@@ -56,6 +84,7 @@ impl Validator for NumberValidator {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct ArrayValidator(pub Box<dyn Validator>);
 
 impl Validator for ArrayValidator {
@@ -89,6 +118,7 @@ impl Validator for ArrayValidator {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct ObjectValidator(pub Vec<(String, Box<dyn Validator>)>);
 
 impl Validator for ObjectValidator {
