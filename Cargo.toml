@@ -1,0 +1,3 @@
+[workspace]
+resolver = "3"
+members = ["deval-cli", "deval-data-model", "deval-validator"]
