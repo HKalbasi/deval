@@ -1,4 +1,5 @@
 use ariadne::{Label, Report, ReportKind, Source};
+use deval_validator::{ArrayValidator, NumberValidator, ObjectValidator, ValidationError, ValidationResult, Validator};
 use std::ops::Range;
 use tree_sitter::{Node, Parser};
 
@@ -71,14 +72,14 @@ fn parse_value(
             let mut cursor = node.walk();
 
             for child in node.children(&mut cursor) {
-                if child.kind() == "value" {
-                    if let Some(value) = parse_value(&child, source, filename, errors) {
-                        children.push(Spanned {
-                            value,
-                            span: make_span(&child, filename),
-                        });
-                    }
+                if ["[", ",", "]"].contains(&child.kind()) {
+                    continue;
                 }
+                let value = parse_value(&child, source, filename, errors)?;
+                children.push(Spanned {
+                    value,
+                    span: make_span(&child, filename),
+                });
             }
 
             Some(SpannedData::Array(children))
@@ -164,6 +165,22 @@ fn make_span(node: &Node, filename: &str) -> Span {
     }
 }
 
+fn report_validation_errors(source: &str, errors: &[ValidationError]) {
+    for error in errors {
+        let source = Source::from(source);
+        // Create a simple error report pointing to the beginning of the file
+        // In a real implementation, you'd want to map errors to specific positions
+        let filename = &*error.span.filename;
+        let span = error.span.start..error.span.end;
+        Report::build(ReportKind::Error, (filename, span.clone()))
+            .with_message(&error.text)
+            .with_label(Label::new((filename, span.clone())).with_message("error occurred here"))
+            .finish()
+            .print((filename, source))
+            .unwrap();
+    }
+}
+
 fn report_errors(filename: &str, source: &str, errors: &[(String, Range<usize>)]) {
     for (error, span) in errors {
         let source = Source::from(source);
@@ -196,6 +213,21 @@ fn main() {
     match parse_json_with_spans(filename, source) {
         Ok(data) => {
             println!("Parsed successfully: {:#?}", data);
+            let validator = ObjectValidator(vec![
+                ("name".to_owned(), Box::new(NumberValidator)),
+                ("hobbies".to_owned(), Box::new(ArrayValidator(Box::new(NumberValidator)))),
+                ("address".to_owned(), Box::new(ObjectValidator(vec![]))),
+            ]);
+            let r = validator.validate(Spanned {
+                value: data,
+                span: Span {
+                    filename: "()".to_string(),
+                    start: 0,
+                    end: 1,
+                },
+            });
+            println!("Parsed successfully: {:#?}", r.result);
+            report_validation_errors(source, &r.errors);
         }
         Err(errors) => {
             eprintln!("Failed to parse JSON:");

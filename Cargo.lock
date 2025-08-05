@@ -36,6 +36,7 @@ version = "0.1.0"
 dependencies = [
  "ariadne",
  "deval-data-model",
+ "deval-validator",
  "tree-sitter",
  "tree-sitter-json",
 ]
@@ -45,8 +46,19 @@ name = "deval-data-model"
 version = "0.1.0"
 
 [[package]]
+name = "deval-schema-ast"
+version = "0.1.0"
+
+[[package]]
+name = "deval-schema-parser"
+version = "0.1.0"
+
+[[package]]
 name = "deval-validator"
 version = "0.1.0"
+dependencies = [
+ "deval-data-model",
+]
 
 [[package]]
 name = "equivalent"
