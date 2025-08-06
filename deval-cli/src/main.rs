@@ -1,7 +1,9 @@
+use std::sync::Arc;
+
 use ariadne::{Color, Config, Fmt, Label, Report, ReportKind, Source};
 use deval_format_json::Json;
 use deval_format_toml::Toml;
-use deval_validator::ValidationError;
+use deval_validator::{AnyValidator, ValidationError};
 
 use deval_data_model::{Format, ParseError};
 
@@ -87,6 +89,7 @@ enum Args {
         #[arg(short, long)]
         file: String,
     },
+    Lsp,
 }
 
 fn main() {
@@ -122,6 +125,18 @@ fn main() {
                     report_errors(&source, &errors);
                 }
             }
+        }
+        Args::Lsp => {
+            tokio::runtime::Builder::new_multi_thread()
+                .enable_all()
+                .build()
+                .expect("Failed building the Runtime")
+                .block_on(async {
+                    deval_lsp::start_server(
+                        Arc::new(Toml),
+                        Arc::new(AnyValidator),
+                    ).await;
+                });
         }
     }
 }

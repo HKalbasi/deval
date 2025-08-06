@@ -9,5 +9,7 @@ clap = { version = "4.5.42", features = ["derive"] }
 deval-data-model = { version = "0.1.0", path = "../deval-data-model" }
 deval-format-json = { version = "0.1.0", path = "../deval-format-json" }
 deval-format-toml = { version = "0.1.0", path = "../deval-format-toml" }
+deval-lsp = { version = "0.1.0", path = "../deval-lsp" }
 deval-schema = { version = "0.1.0", path = "../deval-schema" }
 deval-validator = { version = "0.1.0", path = "../deval-validator" }
+tokio = { version = "1.47.1", features = ["full"] }

@@ -28,7 +28,7 @@ impl ValidationResult {
     }
 }
 
-pub trait Validator: std::fmt::Debug + DynClone {
+pub trait Validator: std::fmt::Debug + DynClone + Send + Sync {
     fn validate(&self, data: Spanned<SpannedData>) -> ValidationResult;
 }
 
@@ -52,7 +52,7 @@ impl<T: Clone + Fn(Spanned<SpannedData>) -> Option<String>> std::fmt::Debug for 
     }
 }
 
-impl<T: Clone + Fn(Spanned<SpannedData>) -> Option<String>> Validator for LambdaValidator<T> {
+impl<T: Clone + Send + Sync + Fn(Spanned<SpannedData>) -> Option<String>> Validator for LambdaValidator<T> {
     fn validate(&self, data: Spanned<SpannedData>) -> ValidationResult {
         let span = data.span.clone();
         if let Some(text) = self.0(data.clone()) {
@@ -112,6 +112,7 @@ impl Validator for ArrayValidator {
                 value: AnnotatedData::Array(items),
                 span: data.span,
                 docs: String::new(),
+                semantic_type: None,
             },
             errors,
         }
@@ -150,6 +151,7 @@ impl Validator for ObjectValidator {
                 value: AnnotatedData::Object(result),
                 span: data.span,
                 docs: String::new(),
+                semantic_type: None,
             },
             errors,
         }

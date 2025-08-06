@@ -1,0 +1,27 @@
+{
+    "name": "deval",
+    "displayName": "deval",
+    "description": "Rust language support for Visual Studio Code",
+    "private": true,
+    "icon": "icon.png",
+    "version": "0.5.0-dev",
+    "releaseTag": null,
+    "publisher": "hkalbasi",
+    "type": "commonjs",
+    "engines": {
+        "vscode": "^1.93.0"
+    },
+    "main": "./out/main",
+    "activationEvents": [
+        "workspaceContains:salam.toml"
+    ],
+    "scripts": {
+        "build-base": "esbuild ./src/main.ts --bundle --outfile=out/main.js --external:vscode --format=cjs --platform=node --target=node20",
+        "build": "npm run build-base -- --sourcemap"
+    },
+    "dependencies": {
+        "esbuild": "^0.25.8",
+        "vscode": "^1.1.37",
+        "vscode-languageclient": "^9.0.1"
+    }
+}

@@ -1,0 +1,12 @@
+[package]
+name = "deval-lsp"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+dashmap = "6.1.0"
+deval-data-model = { version = "0.1.0", path = "../deval-data-model" }
+deval-validator = { version = "0.1.0", path = "../deval-validator" }
+line-index = "0.1.2"
+tokio = { version = "1.47.1", features = ["full"] }
+tower-lsp-server = "0.22.1"
