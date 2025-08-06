@@ -82,3 +82,12 @@ impl From<SpannedData> for AnnotatedData {
         }
     }
 }
+
+pub struct ParseError {
+    pub message: String,
+    pub span: Span,
+}
+
+pub trait Format {
+    fn parse(&self, source: &str, filename: &str) -> Result<Spanned<SpannedData>, Vec<ParseError>>;
+}
