@@ -282,7 +282,7 @@ where
                 AnnotatedData::Null => visitor.visit_unit(),
                 AnnotatedData::Bool(b) => visitor.visit_bool(b.value),
                 AnnotatedData::Number(annotated) => todo!(),
-                AnnotatedData::String(annotated) => todo!(),
+                AnnotatedData::String(annotated) => visitor.visit_str(&annotated.value),
                 AnnotatedData::Array(items) => {
                     visitor.visit_seq(MySeqAccess(items.iter()))
                 },
@@ -387,7 +387,7 @@ where
         where
             V: serde::de::Visitor<'b>,
         {
-            todo!()
+            self.deserialize_any(visitor)
         }
 
         fn deserialize_bytes<V>(self, visitor: V) -> Result<V::Value, Self::Error>

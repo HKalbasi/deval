@@ -1,4 +1,4 @@
-use deval_data_model::{Format, ParseError, Span, Spanned, SpannedData};
+use deval_data_model::{Format, ParseError, Span, SpanSet, Spanned, SpannedData};
 use tree_sitter::{Node, Parser};
 
 pub struct Json;
@@ -19,11 +19,7 @@ impl Format for Json {
 
         let result = result.map(|x| Spanned {
             value: x,
-            span: Span {
-                filename: "()".to_owned(),
-                start: 0,
-                end: 1,
-            },
+            span: make_span_vec(&root_node, filename),
         });
 
         if !errors.is_empty() {
@@ -44,14 +40,14 @@ fn parse_value(
         "null" => Some(SpannedData::Null),
         "false" | "true" => Some(SpannedData::Bool(Spanned {
             value: node.kind() == "true",
-            span: make_span(node, filename),
+            span: make_span_vec(node, filename),
         })),
         "number" => {
             let text = node.utf8_text(source.as_bytes()).ok()?;
             match text.parse::<f64>() {
                 Ok(num) => Some(SpannedData::Number(Spanned {
                     value: num,
-                    span: make_span(node, filename),
+                    span: make_span_vec(node, filename),
                 })),
                 Err(e) => {
                     errors.push(ParseError {
@@ -68,7 +64,7 @@ fn parse_value(
             let content = text[1..text.len() - 1].to_string();
             Some(SpannedData::String(Spanned {
                 value: content,
-                span: make_span(node, filename),
+                span: make_span_vec(node, filename),
             }))
         }
         "array" => {
@@ -82,7 +78,7 @@ fn parse_value(
                 let value = parse_value(&child, source, filename, errors)?;
                 children.push(Spanned {
                     value,
-                    span: make_span(&child, filename),
+                    span: make_span_vec(&child, filename),
                 });
             }
 
@@ -106,11 +102,11 @@ fn parse_value(
                         pairs.push((
                             Spanned {
                                 value: key,
-                                span: make_span(&key_node, filename),
+                                span: make_span_vec(&key_node, filename),
                             },
                             Spanned {
                                 value,
-                                span: make_span(&value_node, filename),
+                                span: make_span_vec(&value_node, filename),
                             },
                         ));
                     }
@@ -163,10 +159,17 @@ fn parse_string_value(
     Some(text[1..text.len() - 1].to_string())
 }
 
+
+/// Creates a `Span` from a `tree_sitter::Node`.
 fn make_span(node: &Node, filename: &str) -> Span {
     Span {
         filename: filename.to_string(),
         start: node.start_byte(),
         end: node.end_byte(),
     }
+}
+
+/// Creates a `Vec<Span>` from a `tree_sitter::Node`.
+fn make_span_vec(node: &Node, filename: &str) -> SpanSet {
+    SpanSet(vec![make_span(node, filename)])
 }

@@ -10,9 +10,18 @@ pub struct Span {
 }
 
 #[derive(Debug, Clone)]
+pub struct SpanSet(pub Vec<Span>);
+
+impl SpanSet {
+    pub fn primary(&self) -> Span {
+        self.0[0].clone()
+    }
+}
+
+#[derive(Debug, Clone)]
 pub struct Spanned<T> {
     pub value: T,
-    pub span: Span,
+    pub span: SpanSet,
 }
 
 #[derive(Debug, Clone)]
@@ -48,7 +57,7 @@ pub enum SemanticType {
 #[derive(Debug)]
 pub struct Annotated<T> {
     pub value: T,
-    pub span: Span,
+    pub span: SpanSet,
     pub docs: String,
     pub semantic_type: Option<SemanticType>,
 }
@@ -84,8 +93,8 @@ pub enum AnnotatedData {
 }
 
 impl AnnotatedData {
-    pub fn walk(&self, f: &mut impl FnMut(Span, &str, Option<SemanticType>)) {
-        fn for_annotated<T>(t: &Annotated<T>, f: &mut impl FnMut(Span, &str, Option<SemanticType>)) {
+    pub fn walk(&self, f: &mut impl FnMut(SpanSet, &str, Option<SemanticType>)) {
+        fn for_annotated<T>(t: &Annotated<T>, f: &mut impl FnMut(SpanSet, &str, Option<SemanticType>)) {
             f(t.span.clone(), &t.docs, t.semantic_type);
         }
         match self {

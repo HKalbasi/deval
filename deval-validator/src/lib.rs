@@ -56,7 +56,7 @@ impl<T: Clone + Fn(Spanned<SpannedData>) -> Option<String>> std::fmt::Debug for 
 
 impl<T: Clone + Send + Sync + Fn(Spanned<SpannedData>) -> Option<String>> Validator for LambdaValidator<T> {
     fn validate(&self, data: Spanned<SpannedData>) -> ValidationResult {
-        let span = data.span.clone();
+        let span = data.span.primary();
         if let Some(text) = self.0(data.clone()) {
             return ValidationResult {
                 errors: vec![ValidationError { span, text }],
@@ -76,7 +76,7 @@ impl Validator for NumberValidator {
         let SpannedData::Number(_n) = &data.value else {
             return ValidationResult {
                 errors: vec![ValidationError {
-                    span: data.span.clone(),
+                    span: data.span.primary(),
                     text: format!("Expected Number, found {}", data.value.kind()),
                 }],
                 result: data.into(),
@@ -94,7 +94,7 @@ impl Validator for ArrayValidator {
         let SpannedData::Array(items) = data.value else {
             return ValidationResult {
                 errors: vec![ValidationError {
-                    span: data.span.clone(),
+                    span: data.span.primary(),
                     text: format!("Expected Object, found {}", data.value.kind()),
                 }],
                 result: data.into(),
@@ -135,7 +135,7 @@ impl Validator for ObjectValidator {
         let SpannedData::Object(key_values) = data.value else {
             return ValidationResult {
                 errors: vec![ValidationError {
-                    span: data.span.clone(),
+                    span: data.span.primary(),
                     text: format!("Expected Object, found {}", data.value.kind()),
                 }],
                 result: data.into(),
@@ -149,14 +149,14 @@ impl Validator for ObjectValidator {
         for (key, value) in key_values {
             if !visited_keys.insert(key.value.clone()) {
                 errors.push(ValidationError {
-                    span: key.span.clone(),
+                    span: key.span.primary(),
                     text: format!("Duplicate key {}", key.value),
                 });
             }
 
             let Some((_, validator)) = self.0.iter().find(|x| x.0 == key.value) else {
                 errors.push(ValidationError {
-                    span: key.span,
+                    span: key.span.primary(),
                     text: format!("Unexpected key {}", key.value),
                 });
                 continue;
@@ -168,7 +168,7 @@ impl Validator for ObjectValidator {
         for mandatory_key in self.mandatory_keys() {
             if !visited_keys.contains(mandatory_key) {
                 errors.push(ValidationError {
-                    span: data.span.clone(),
+                    span: data.span.primary(),
                     text: format!("Missing key {}", mandatory_key),
                 });
             }
