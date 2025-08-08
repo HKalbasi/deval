@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use deval_data_model::{Annotated, AnnotatedData, Span, Spanned, SpannedData};
 use dyn_clone::DynClone;
 
@@ -122,6 +124,12 @@ impl Validator for ArrayValidator {
 #[derive(Debug, Clone)]
 pub struct ObjectValidator(pub Vec<(String, Box<dyn Validator>)>);
 
+impl ObjectValidator {
+    fn mandatory_keys(&self) -> impl Iterator<Item = &str> {
+        self.0.iter().map(|x| &*x.0)
+    }
+}
+
 impl Validator for ObjectValidator {
     fn validate(&self, data: Spanned<SpannedData>) -> ValidationResult {
         let SpannedData::Object(key_values) = data.value else {
@@ -135,7 +143,17 @@ impl Validator for ObjectValidator {
         };
         let mut errors = vec![];
         let mut result: Vec<(Annotated<String>, Annotated<AnnotatedData>)> = vec![];
+
+        let mut visited_keys = HashSet::new();
+
         for (key, value) in key_values {
+            if !visited_keys.insert(key.value.clone()) {
+                errors.push(ValidationError {
+                    span: key.span.clone(),
+                    text: format!("Duplicate key {}", key.value),
+                });
+            }
+
             let Some((_, validator)) = self.0.iter().find(|x| x.0 == key.value) else {
                 errors.push(ValidationError {
                     span: key.span,
@@ -146,6 +164,16 @@ impl Validator for ObjectValidator {
             let r = validator.validate(value);
             result.push((key.into(), r.append_errors_and_return_result(&mut errors)));
         }
+
+        for mandatory_key in self.mandatory_keys() {
+            if !visited_keys.contains(mandatory_key) {
+                errors.push(ValidationError {
+                    span: data.span.clone(),
+                    text: format!("Missing key {}", mandatory_key),
+                });
+            }
+        }
+
         ValidationResult {
             result: Annotated {
                 value: AnnotatedData::Object(result),

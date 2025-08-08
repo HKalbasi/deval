@@ -109,7 +109,6 @@ fn main() {
             };
             match format.parse(&source, &file) {
                 Ok(data) => {
-                    println!("{:#?}", data);
                     let validator = match deval_schema::compile(&schema_source) {
                         Ok(v) => v,
                         Err(e) => {
@@ -121,7 +120,6 @@ fn main() {
                     report_validation_errors(&source, &r.errors);
                 }
                 Err(errors) => {
-                    eprintln!("Failed to parse JSON:");
                     report_errors(&source, &errors);
                 }
             }
