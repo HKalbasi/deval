@@ -28,7 +28,7 @@ impl LanguageServer for Backend {
             }),
             capabilities: ServerCapabilities {
                 text_document_sync: Some(TextDocumentSyncCapability::Kind(
-                    TextDocumentSyncKind::INCREMENTAL,
+                    TextDocumentSyncKind::FULL,
                 )),
                 semantic_tokens_provider: Some(
                     SemanticTokensServerCapabilities::SemanticTokensOptions(
@@ -89,7 +89,10 @@ impl LanguageServer for Backend {
         let uri = params.text_document.uri;
         let text = params.text_document.text;
 
-        self.documents.insert(uri, Document::new(&text, self.format.clone(), self.schema.clone()));
+        self.documents.insert(
+            uri,
+            Document::new(&text, self.format.clone(), self.schema.clone()),
+        );
     }
 
     async fn did_change(&self, params: DidChangeTextDocumentParams) {
@@ -118,11 +121,8 @@ impl LanguageServer for Backend {
         &self,
         params: SemanticTokensParams,
     ) -> Result<Option<SemanticTokensResult>> {
-        self.client
-            .log_message(MessageType::INFO, "full!")
-            .await;
-        
-        
+        self.client.log_message(MessageType::INFO, "full!").await;
+
         let Some(doc) = self.documents.get(&params.text_document.uri) else {
             self.client
                 .log_message(MessageType::ERROR, "doc was missing!")
@@ -136,7 +136,9 @@ impl LanguageServer for Backend {
             return Ok(None);
         };
         let mut result = vec![];
-        dbg!(&data);
+        let mut prev_line = 0;
+        let mut prev_col = 0;
+
         data.value.walk(&mut |span, _, semantic| {
             let token_type = match semantic {
                 Some(SemanticType::Number) => 19,
@@ -144,14 +146,21 @@ impl LanguageServer for Backend {
                 Some(SemanticType::Variable) => 8,
                 None => return,
             };
-            let l = doc.line_index.line_col(TextSize::try_from(span.start).unwrap());
-            result.push(dbg!(SemanticToken {
-                            delta_line: l.line,
-                            delta_start: l.col,
-                            length: (span.end - span.start) as u32,
-                            token_type,
-                            token_modifiers_bitset: 0,
-                        }));
+            let l = doc
+                .line_index
+                .line_col(TextSize::try_from(span.start).unwrap());
+            if l.line != prev_line {
+                prev_col = 0;
+            }
+            result.push(SemanticToken {
+                delta_line: l.line - prev_line,
+                delta_start: l.col - prev_col,
+                length: (span.end - span.start) as u32,
+                token_type,
+                token_modifiers_bitset: 0,
+            });
+            prev_col = l.col;
+            prev_line = l.line;
         });
         Ok(Some(SemanticTokensResult::Tokens(SemanticTokens {
             result_id: None,
