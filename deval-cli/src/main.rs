@@ -1,11 +1,23 @@
-use std::sync::Arc;
+use std::{path::PathBuf, sync::Arc};
 
 use ariadne::{Color, Config, Fmt, Label, Report, ReportKind, Source};
 use deval_format_json::Json;
 use deval_format_toml::Toml;
-use deval_validator::{AnyValidator, ValidationError};
+use deval_validator::{AnyValidator, ValidationError, Validator};
 
 use deval_data_model::{Format, ParseError};
+use serde::Deserialize;
+
+#[derive(Debug, Deserialize)]
+struct DevalRule {
+    filename: String,
+    schema: PathBuf,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct DevalConfig {
+    rules: Vec<DevalRule>,
+}
 
 fn report_validation_errors(source: &str, errors: &[ValidationError]) {
     for error in errors {
@@ -92,12 +104,26 @@ enum Args {
     Lsp,
 }
 
+fn load_config() -> DevalConfig {
+    let Ok(text) = std::fs::read_to_string("/root/.config/deval/config.toml") else {
+        return DevalConfig::default();
+    };
+    let spanned = Toml.parse(&text, "config.toml").unwrap_or_else(|e| {
+        report_errors(&text, &e);
+        panic!();
+    });
+    let annotated = AnyValidator.validate(spanned);
+    deval_serde::deserialize_from_annotated(&annotated.result)
+}
+
 fn main() {
     use clap::Parser;
     let args = Args::parse();
 
     match args {
         Args::Check { schema, file } => {
+            let config = load_config();
+            dbg!(&config);
             let schema_source = std::fs::read_to_string(&schema).unwrap();
             let source = std::fs::read_to_string(&file).unwrap();
             let format: Box<dyn Format> = if file.ends_with(".json") {
@@ -123,6 +149,7 @@ fn main() {
                     report_errors(&source, &errors);
                 }
             }
+            println!("Input matches the schema!");
         }
         Args::Lsp => {
             tokio::runtime::Builder::new_multi_thread()

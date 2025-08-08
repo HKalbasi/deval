@@ -234,7 +234,9 @@ dependencies = [
  "deval-format-toml",
  "deval-lsp",
  "deval-schema",
+ "deval-serde",
  "deval-validator",
+ "serde",
  "tokio",
 ]
 
@@ -292,6 +294,14 @@ version = "0.1.0"
 dependencies = [
  "chumsky",
  "deval-schema-ast",
+]
+
+[[package]]
+name = "deval-serde"
+version = "0.1.0"
+dependencies = [
+ "deval-data-model",
+ "serde",
 ]
 
 [[package]]
