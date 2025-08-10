@@ -1,4 +1,8 @@
-use std::{path::PathBuf, sync::Arc};
+use std::{
+    os::unix::ffi::OsStrExt,
+    path::{Path, PathBuf},
+    sync::Arc,
+};
 
 use ariadne::{Color, Config, Fmt, Label, Report, ReportKind, Source};
 use deval_format_json::Json;
@@ -8,7 +12,7 @@ use deval_validator::{AnyValidator, ValidationError, Validator};
 use deval_data_model::{Format, ParseError};
 use serde::Deserialize;
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 struct DevalRule {
     filename: String,
     schema: PathBuf,
@@ -17,6 +21,28 @@ struct DevalRule {
 #[derive(Debug, Default, Deserialize)]
 struct DevalConfig {
     rules: Vec<DevalRule>,
+}
+impl DevalConfig {
+    fn find_schema_path(&self, file: &Path) -> Option<PathBuf> {
+        let near = file.with_file_name({
+            let mut changed_name = file.file_stem()?.to_owned();
+            changed_name.push(".dvl");
+            changed_name
+        });
+        if near.exists() {
+            return Some(near);
+        }
+        Some(
+            self.rules
+                .iter()
+                .find(|rule| {
+                    file.file_name()
+                        .is_some_and(|x| x.as_bytes() == rule.filename.as_bytes())
+                })
+                .cloned()?
+                .schema,
+        )
+    }
 }
 
 fn report_validation_errors(source: &str, errors: &[ValidationError]) {
@@ -97,9 +123,9 @@ fn display_errors(src: &str, errors: Vec<deval_schema::Error<'_>>) {
 enum Args {
     Check {
         #[arg(short, long)]
-        schema: String,
+        schema: Option<PathBuf>,
         #[arg(short, long)]
-        file: String,
+        file: PathBuf,
     },
     Lsp,
 }
@@ -122,18 +148,35 @@ fn main() {
 
     match args {
         Args::Check { schema, file } => {
-            let config = load_config();
-            dbg!(&config);
+            let schema = match schema {
+                Some(path) => path,
+                None => {
+                    let config = load_config();
+                    dbg!(&config);
+                    match config.find_schema_path(&file) {
+                        Some(path) => path,
+                        None => {
+                            println!("Unknown schema for {file:?}");
+                            return;
+                        }
+                    }
+                }
+            };
             let schema_source = std::fs::read_to_string(&schema).unwrap();
             let source = std::fs::read_to_string(&file).unwrap();
-            let format: Box<dyn Format> = if file.ends_with(".json") {
-                Box::new(Json)
-            } else if file.ends_with(".toml") {
-                Box::new(Toml)    
-            } else {
-                panic!("Unknown format");
+            let format: Box<dyn Format> = match file.extension().and_then(|x| x.to_str()) {
+                Some("json") => Box::new(Json),
+                Some("toml") => Box::new(Toml),
+                Some(f) => panic!("Unknown format {f}"),
+                None => panic!("Unknown format"),
             };
-            match format.parse(&source, &file) {
+            match format.parse(
+                &source,
+                &file
+                    .file_name()
+                    .map(|x| x.to_string_lossy())
+                    .unwrap_or_default(),
+            ) {
                 Ok(data) => {
                     let validator = match deval_schema::compile(&schema_source) {
                         Ok(v) => v,
@@ -157,10 +200,7 @@ fn main() {
                 .build()
                 .expect("Failed building the Runtime")
                 .block_on(async {
-                    deval_lsp::start_server(
-                        Arc::new(Toml),
-                        Arc::new(AnyValidator),
-                    ).await;
+                    deval_lsp::start_server(Arc::new(Toml), Arc::new(AnyValidator)).await;
                 });
         }
     }

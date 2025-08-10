@@ -1,1 +1,11 @@
-any
+{
+    bar: { x: number }[],
+    foo: {
+        a: {
+            x: number,
+        },
+        b: {
+            y: number,
+        },
+    },
+}
