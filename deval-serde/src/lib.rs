@@ -42,180 +42,180 @@ where
         fn deserialize_bool<V>(self, visitor: V) -> Result<V::Value, Self::Error>
         where
             V: de::Visitor<'b> {
-            todo!()
+            self.deserialize_any(visitor)
         }
     
         fn deserialize_i8<V>(self, visitor: V) -> Result<V::Value, Self::Error>
         where
             V: de::Visitor<'b> {
-            todo!()
+            self.deserialize_any(visitor)
         }
     
         fn deserialize_i16<V>(self, visitor: V) -> Result<V::Value, Self::Error>
         where
             V: de::Visitor<'b> {
-            todo!()
+            self.deserialize_any(visitor)
         }
     
         fn deserialize_i32<V>(self, visitor: V) -> Result<V::Value, Self::Error>
         where
             V: de::Visitor<'b> {
-            todo!()
+            self.deserialize_any(visitor)
         }
     
         fn deserialize_i64<V>(self, visitor: V) -> Result<V::Value, Self::Error>
         where
             V: de::Visitor<'b> {
-            todo!()
+            self.deserialize_any(visitor)
         }
     
         fn deserialize_u8<V>(self, visitor: V) -> Result<V::Value, Self::Error>
         where
             V: de::Visitor<'b> {
-            todo!()
+            self.deserialize_any(visitor)
         }
     
         fn deserialize_u16<V>(self, visitor: V) -> Result<V::Value, Self::Error>
         where
             V: de::Visitor<'b> {
-            todo!()
+            self.deserialize_any(visitor)
         }
     
         fn deserialize_u32<V>(self, visitor: V) -> Result<V::Value, Self::Error>
         where
             V: de::Visitor<'b> {
-            todo!()
+            self.deserialize_any(visitor)
         }
     
         fn deserialize_u64<V>(self, visitor: V) -> Result<V::Value, Self::Error>
         where
             V: de::Visitor<'b> {
-            todo!()
+            self.deserialize_any(visitor)
         }
     
         fn deserialize_f32<V>(self, visitor: V) -> Result<V::Value, Self::Error>
         where
             V: de::Visitor<'b> {
-            todo!()
+            self.deserialize_any(visitor)
         }
     
         fn deserialize_f64<V>(self, visitor: V) -> Result<V::Value, Self::Error>
         where
             V: de::Visitor<'b> {
-            todo!()
+            self.deserialize_any(visitor)
         }
     
         fn deserialize_char<V>(self, visitor: V) -> Result<V::Value, Self::Error>
         where
             V: de::Visitor<'b> {
-            todo!()
+            self.deserialize_any(visitor)
         }
     
         fn deserialize_str<V>(self, visitor: V) -> Result<V::Value, Self::Error>
         where
             V: de::Visitor<'b> {
-            todo!()
+            self.deserialize_any(visitor)
         }
     
         fn deserialize_string<V>(self, visitor: V) -> Result<V::Value, Self::Error>
         where
             V: de::Visitor<'b> {
-            todo!()
+            self.deserialize_any(visitor)
         }
     
         fn deserialize_bytes<V>(self, visitor: V) -> Result<V::Value, Self::Error>
         where
             V: de::Visitor<'b> {
-            todo!()
+            self.deserialize_any(visitor)
         }
     
         fn deserialize_byte_buf<V>(self, visitor: V) -> Result<V::Value, Self::Error>
         where
             V: de::Visitor<'b> {
-            todo!()
+            self.deserialize_any(visitor)
         }
     
         fn deserialize_option<V>(self, visitor: V) -> Result<V::Value, Self::Error>
         where
             V: de::Visitor<'b> {
-            todo!()
+            self.deserialize_any(visitor)
         }
     
         fn deserialize_unit<V>(self, visitor: V) -> Result<V::Value, Self::Error>
         where
             V: de::Visitor<'b> {
-            todo!()
+            self.deserialize_any(visitor)
         }
     
         fn deserialize_unit_struct<V>(
             self,
-            name: &'static str,
+            _name: &'static str,
             visitor: V,
         ) -> Result<V::Value, Self::Error>
         where
             V: de::Visitor<'b> {
-            todo!()
+            self.deserialize_any(visitor)
         }
     
         fn deserialize_newtype_struct<V>(
             self,
-            name: &'static str,
+            _name: &'static str,
             visitor: V,
         ) -> Result<V::Value, Self::Error>
         where
             V: de::Visitor<'b> {
-            todo!()
+            self.deserialize_any(visitor)
         }
     
         fn deserialize_seq<V>(self, visitor: V) -> Result<V::Value, Self::Error>
         where
             V: de::Visitor<'b> {
-            todo!()
+            self.deserialize_any(visitor)
         }
     
-        fn deserialize_tuple<V>(self, len: usize, visitor: V) -> Result<V::Value, Self::Error>
+        fn deserialize_tuple<V>(self, _len: usize, visitor: V) -> Result<V::Value, Self::Error>
         where
             V: de::Visitor<'b> {
-            todo!()
+            self.deserialize_any(visitor)
         }
     
         fn deserialize_tuple_struct<V>(
             self,
-            name: &'static str,
-            len: usize,
+            _name: &'static str,
+            _len: usize,
             visitor: V,
         ) -> Result<V::Value, Self::Error>
         where
             V: de::Visitor<'b> {
-            todo!()
+            self.deserialize_any(visitor)
         }
     
         fn deserialize_map<V>(self, visitor: V) -> Result<V::Value, Self::Error>
         where
             V: de::Visitor<'b> {
-            todo!()
+            self.deserialize_any(visitor)
         }
     
         fn deserialize_struct<V>(
             self,
-            name: &'static str,
-            fields: &'static [&'static str],
+            _name: &'static str,
+            _fields: &'static [&'static str],
             visitor: V,
         ) -> Result<V::Value, Self::Error>
         where
             V: de::Visitor<'b> {
-            todo!()
+            self.deserialize_any(visitor)
         }
     
         fn deserialize_enum<V>(
             self,
-            name: &'static str,
-            variants: &'static [&'static str],
+            _name: &'static str,
+            _variants: &'static [&'static str],
             visitor: V,
         ) -> Result<V::Value, Self::Error>
         where
             V: de::Visitor<'b> {
-            todo!()
+            self.deserialize_any(visitor)
         }
     
         fn deserialize_identifier<V>(self, visitor: V) -> Result<V::Value, Self::Error>
@@ -227,7 +227,7 @@ where
         fn deserialize_ignored_any<V>(self, visitor: V) -> Result<V::Value, Self::Error>
         where
             V: de::Visitor<'b> {
-            todo!()
+            self.deserialize_any(visitor)
         }
     }
 
@@ -281,7 +281,7 @@ where
             match &self.0.value {
                 AnnotatedData::Null => visitor.visit_unit(),
                 AnnotatedData::Bool(b) => visitor.visit_bool(b.value),
-                AnnotatedData::Number(annotated) => todo!(),
+                AnnotatedData::Number(annotated) => visitor.visit_f64(annotated.value),
                 AnnotatedData::String(annotated) => visitor.visit_str(&annotated.value),
                 AnnotatedData::Array(items) => {
                     visitor.visit_seq(MySeqAccess(items.iter()))
@@ -296,91 +296,91 @@ where
         where
             V: serde::de::Visitor<'b>,
         {
-            todo!()
+            self.deserialize_any(visitor)
         }
 
         fn deserialize_i8<V>(self, visitor: V) -> Result<V::Value, Self::Error>
         where
             V: serde::de::Visitor<'b>,
         {
-            todo!()
+            self.deserialize_any(visitor)
         }
 
         fn deserialize_i16<V>(self, visitor: V) -> Result<V::Value, Self::Error>
         where
             V: serde::de::Visitor<'b>,
         {
-            todo!()
+            self.deserialize_any(visitor)
         }
 
         fn deserialize_i32<V>(self, visitor: V) -> Result<V::Value, Self::Error>
         where
             V: serde::de::Visitor<'b>,
         {
-            todo!()
+            self.deserialize_any(visitor)
         }
 
         fn deserialize_i64<V>(self, visitor: V) -> Result<V::Value, Self::Error>
         where
             V: serde::de::Visitor<'b>,
         {
-            todo!()
+            self.deserialize_any(visitor)
         }
 
         fn deserialize_u8<V>(self, visitor: V) -> Result<V::Value, Self::Error>
         where
             V: serde::de::Visitor<'b>,
         {
-            todo!()
+            self.deserialize_any(visitor)
         }
 
         fn deserialize_u16<V>(self, visitor: V) -> Result<V::Value, Self::Error>
         where
             V: serde::de::Visitor<'b>,
         {
-            todo!()
+            self.deserialize_any(visitor)
         }
 
         fn deserialize_u32<V>(self, visitor: V) -> Result<V::Value, Self::Error>
         where
             V: serde::de::Visitor<'b>,
         {
-            todo!()
+            self.deserialize_any(visitor)
         }
 
         fn deserialize_u64<V>(self, visitor: V) -> Result<V::Value, Self::Error>
         where
             V: serde::de::Visitor<'b>,
         {
-            todo!()
+            self.deserialize_any(visitor)
         }
 
         fn deserialize_f32<V>(self, visitor: V) -> Result<V::Value, Self::Error>
         where
             V: serde::de::Visitor<'b>,
         {
-            todo!()
+            self.deserialize_any(visitor)
         }
 
         fn deserialize_f64<V>(self, visitor: V) -> Result<V::Value, Self::Error>
         where
             V: serde::de::Visitor<'b>,
         {
-            todo!()
+            self.deserialize_any(visitor)
         }
 
         fn deserialize_char<V>(self, visitor: V) -> Result<V::Value, Self::Error>
         where
             V: serde::de::Visitor<'b>,
         {
-            todo!()
+            self.deserialize_any(visitor)
         }
 
         fn deserialize_str<V>(self, visitor: V) -> Result<V::Value, Self::Error>
         where
             V: serde::de::Visitor<'b>,
         {
-            todo!()
+            self.deserialize_any(visitor)
         }
 
         fn deserialize_string<V>(self, visitor: V) -> Result<V::Value, Self::Error>
@@ -394,50 +394,50 @@ where
         where
             V: serde::de::Visitor<'b>,
         {
-            todo!()
+            self.deserialize_any(visitor)
         }
 
         fn deserialize_byte_buf<V>(self, visitor: V) -> Result<V::Value, Self::Error>
         where
             V: serde::de::Visitor<'b>,
         {
-            todo!()
+            self.deserialize_any(visitor)
         }
 
         fn deserialize_option<V>(self, visitor: V) -> Result<V::Value, Self::Error>
         where
             V: serde::de::Visitor<'b>,
         {
-            todo!()
+            self.deserialize_any(visitor)
         }
 
         fn deserialize_unit<V>(self, visitor: V) -> Result<V::Value, Self::Error>
         where
             V: serde::de::Visitor<'b>,
         {
-            todo!()
+            self.deserialize_any(visitor)
         }
 
         fn deserialize_unit_struct<V>(
             self,
-            name: &'static str,
+            _name: &'static str,
             visitor: V,
         ) -> Result<V::Value, Self::Error>
         where
             V: serde::de::Visitor<'b>,
         {
-            todo!()
+            self.deserialize_any(visitor)
         }
 
         fn deserialize_newtype_struct<V>(
             self,
-            name: &'static str,
+            _name: &'static str,
             visitor: V,
         ) -> Result<V::Value, Self::Error>
         where
             V: serde::de::Visitor<'b>,
         {
-            todo!()
+            self.deserialize_any(visitor)
         }
 
         fn deserialize_seq<V>(self, visitor: V) -> Result<V::Value, Self::Error>
@@ -447,30 +447,30 @@ where
             self.deserialize_any(visitor)
         }
 
-        fn deserialize_tuple<V>(self, len: usize, visitor: V) -> Result<V::Value, Self::Error>
+        fn deserialize_tuple<V>(self, _len: usize, visitor: V) -> Result<V::Value, Self::Error>
         where
             V: serde::de::Visitor<'b>,
         {
-            todo!()
+            self.deserialize_any(visitor)
         }
 
         fn deserialize_tuple_struct<V>(
             self,
-            name: &'static str,
-            len: usize,
+            _name: &'static str,
+            _len: usize,
             visitor: V,
         ) -> Result<V::Value, Self::Error>
         where
             V: serde::de::Visitor<'b>,
         {
-            todo!()
+            self.deserialize_any(visitor)
         }
 
         fn deserialize_map<V>(self, visitor: V) -> Result<V::Value, Self::Error>
         where
             V: serde::de::Visitor<'b>,
         {
-            todo!()
+            self.deserialize_any(visitor)
         }
 
         fn deserialize_struct<V>(
@@ -487,28 +487,28 @@ where
 
         fn deserialize_enum<V>(
             self,
-            name: &'static str,
-            variants: &'static [&'static str],
+            _name: &'static str,
+            _variants: &'static [&'static str],
             visitor: V,
         ) -> Result<V::Value, Self::Error>
         where
             V: serde::de::Visitor<'b>,
         {
-            todo!()
+            self.deserialize_any(visitor)
         }
 
         fn deserialize_identifier<V>(self, visitor: V) -> Result<V::Value, Self::Error>
         where
             V: serde::de::Visitor<'b>,
         {
-            todo!()
+            self.deserialize_any(visitor)
         }
 
         fn deserialize_ignored_any<V>(self, visitor: V) -> Result<V::Value, Self::Error>
         where
             V: serde::de::Visitor<'b>,
         {
-            todo!()
+            self.deserialize_any(visitor)
         }
     }
 
