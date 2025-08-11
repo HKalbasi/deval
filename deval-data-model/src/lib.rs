@@ -144,6 +144,7 @@ impl From<SpannedData> for AnnotatedData {
     }
 }
 
+#[derive(Debug)]
 pub struct ParseError {
     pub message: String,
     pub span: Span,

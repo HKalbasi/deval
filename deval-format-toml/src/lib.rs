@@ -397,3 +397,319 @@ fn unquote_toml_string(text: &str) -> String {
     }
     text.to_string()
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use deval_data_model::{Format, Spanned, SpannedData};
+    
+    #[test]
+    fn test_parse_simple_key_value() {
+        let toml = r#"name = "John Doe""#;
+        let result = Toml.parse(toml, "test.toml");
+        
+        assert!(result.is_ok());
+        let parsed = result.expect("Failed to parse TOML");
+        
+        match parsed.value {
+            SpannedData::Object(pairs) => {
+                assert_eq!(pairs.len(), 1);
+                assert_eq!(pairs[0].0.value, "name");
+                match &pairs[0].1.value {
+                    SpannedData::String(s) => assert_eq!(s.value, "John Doe"),
+                    _ => panic!("Expected string value"),
+                }
+            }
+            _ => panic!("Expected object"),
+        }
+    }
+    
+    #[test]
+    fn test_parse_numbers() {
+        let toml = r#"age = 30
+height = 5.9"#;
+        let result = Toml.parse(toml, "test.toml");
+        
+        assert!(result.is_ok());
+        let parsed = result.expect("Failed to parse TOML");
+        
+        match parsed.value {
+            SpannedData::Object(pairs) => {
+                assert_eq!(pairs.len(), 2);
+                
+                // Check age
+                assert_eq!(pairs[0].0.value, "age");
+                match &pairs[0].1.value {
+                    SpannedData::Number(n) => assert_eq!(n.value, 30.0),
+                    _ => panic!("Expected number value for age"),
+                }
+                
+                // Check height
+                assert_eq!(pairs[1].0.value, "height");
+                match &pairs[1].1.value {
+                    SpannedData::Number(n) => assert_eq!(n.value, 5.9),
+                    _ => panic!("Expected number value for height"),
+                }
+            }
+            _ => panic!("Expected object"),
+        }
+    }
+    
+    #[test]
+    fn test_parse_booleans() {
+        let toml = r#"is_active = true
+is_deleted = false"#;
+        let result = Toml.parse(toml, "test.toml");
+        
+        assert!(result.is_ok());
+        let parsed = result.expect("Failed to parse TOML");
+        
+        match parsed.value {
+            SpannedData::Object(pairs) => {
+                assert_eq!(pairs.len(), 2);
+                
+                // Check is_active
+                assert_eq!(pairs[0].0.value, "is_active");
+                match &pairs[0].1.value {
+                    SpannedData::Bool(b) => assert_eq!(b.value, true),
+                    _ => panic!("Expected boolean true"),
+                }
+                
+                // Check is_deleted
+                assert_eq!(pairs[1].0.value, "is_deleted");
+                match &pairs[1].1.value {
+                    SpannedData::Bool(b) => assert_eq!(b.value, false),
+                    _ => panic!("Expected boolean false"),
+                }
+            }
+            _ => panic!("Expected object"),
+        }
+    }
+    
+    #[test]
+    fn test_parse_arrays() {
+        let toml = r#"numbers = [1, 2, 3]
+names = ["Alice", "Bob"]"#;
+        let result = Toml.parse(toml, "test.toml");
+        
+        assert!(result.is_ok());
+        let parsed = result.expect("Failed to parse TOML");
+        
+        match parsed.value {
+            SpannedData::Object(pairs) => {
+                assert_eq!(pairs.len(), 2);
+                
+                // Check numbers array
+                assert_eq!(pairs[0].0.value, "numbers");
+                match &pairs[0].1.value {
+                    SpannedData::Array(arr) => {
+                        assert_eq!(arr.len(), 3);
+                        for (i, item) in arr.iter().enumerate() {
+                            match &item.value {
+                                SpannedData::Number(n) => assert_eq!(n.value, (i + 1) as f64),
+                                _ => panic!("Expected number values in array"),
+                            }
+                        }
+                    }
+                    _ => panic!("Expected array for numbers"),
+                }
+                
+                // Check names array
+                assert_eq!(pairs[1].0.value, "names");
+                match &pairs[1].1.value {
+                    SpannedData::Array(arr) => {
+                        assert_eq!(arr.len(), 2);
+                        match &arr[0].value {
+                            SpannedData::String(s) => assert_eq!(s.value, "Alice"),
+                            _ => panic!("Expected string value"),
+                        }
+                        match &arr[1].value {
+                            SpannedData::String(s) => assert_eq!(s.value, "Bob"),
+                            _ => panic!("Expected string value"),
+                        }
+                    }
+                    _ => panic!("Expected array for names"),
+                }
+            }
+            _ => panic!("Expected object"),
+        }
+    }
+    
+    #[test]
+    fn test_parse_inline_tables() {
+        let toml = r#"point = { x = 1, y = 2 }"#;
+        let result = Toml.parse(toml, "test.toml");
+        
+        assert!(result.is_ok());
+        let parsed = result.expect("Failed to parse TOML");
+        
+        match parsed.value {
+            SpannedData::Object(pairs) => {
+                assert_eq!(pairs.len(), 1);
+                assert_eq!(pairs[0].0.value, "point");
+                
+                match &pairs[0].1.value {
+                    SpannedData::Object(inner_pairs) => {
+                        assert_eq!(inner_pairs.len(), 2);
+                        
+                        // Check x field
+                        assert_eq!(inner_pairs[0].0.value, "x");
+                        match &inner_pairs[0].1.value {
+                            SpannedData::Number(n) => assert_eq!(n.value, 1.0),
+                            _ => panic!("Expected number value for x"),
+                        }
+                        
+                        // Check y field
+                        assert_eq!(inner_pairs[1].0.value, "y");
+                        match &inner_pairs[1].1.value {
+                            SpannedData::Number(n) => assert_eq!(n.value, 2.0),
+                            _ => panic!("Expected number value for y"),
+                        }
+                    }
+                    _ => panic!("Expected inline table"),
+                }
+            }
+            _ => panic!("Expected object"),
+        }
+    }
+    
+    #[test]
+    fn test_parse_tables() {
+        let toml = r#"[person]
+name = "Alice"
+age = 25"#;
+        let result = Toml.parse(toml, "test.toml");
+        
+        assert!(result.is_ok());
+        let parsed = result.expect("Failed to parse TOML");
+        
+        match parsed.value {
+            SpannedData::Object(pairs) => {
+                assert_eq!(pairs.len(), 1);
+                assert_eq!(pairs[0].0.value, "person");
+                
+                match &pairs[0].1.value {
+                    SpannedData::Object(inner_pairs) => {
+                        assert_eq!(inner_pairs.len(), 2);
+                        
+                        // Check name field
+                        assert_eq!(inner_pairs[0].0.value, "name");
+                        match &inner_pairs[0].1.value {
+                            SpannedData::String(s) => assert_eq!(s.value, "Alice"),
+                            _ => panic!("Expected string value for name"),
+                        }
+                        
+                        // Check age field
+                        assert_eq!(inner_pairs[1].0.value, "age");
+                        match &inner_pairs[1].1.value {
+                            SpannedData::Number(n) => assert_eq!(n.value, 25.0),
+                            _ => panic!("Expected number value for age"),
+                        }
+                    }
+                    _ => panic!("Expected table object"),
+                }
+            }
+            _ => panic!("Expected object"),
+        }
+    }
+    
+    #[test]
+    fn test_parse_array_of_tables() {
+        let toml = r#"[[products]]
+name = "Hammer"
+sku = 738594937
+
+[[products]]
+name = "Nail"
+sku = 284758393"#;
+        let result = Toml.parse(toml, "test.toml");
+        
+        assert!(result.is_ok());
+        let parsed = result.expect("Failed to parse TOML");
+        
+        match parsed.value {
+            SpannedData::Object(pairs) => {
+                assert_eq!(pairs.len(), 1);
+                assert_eq!(pairs[0].0.value, "products");
+                
+                match &pairs[0].1.value {
+                    SpannedData::Array(arr) => {
+                        assert_eq!(arr.len(), 2);
+                        
+                        // Check first product
+                        match &arr[0].value {
+                            SpannedData::Object(product_pairs) => {
+                                assert_eq!(product_pairs.len(), 2);
+                                
+                                // Check name
+                                assert_eq!(product_pairs[0].0.value, "name");
+                                match &product_pairs[0].1.value {
+                                    SpannedData::String(s) => assert_eq!(s.value, "Hammer"),
+                                    _ => panic!("Expected string value for name"),
+                                }
+                                
+                                // Check sku
+                                assert_eq!(product_pairs[1].0.value, "sku");
+                                match &product_pairs[1].1.value {
+                                    SpannedData::Number(n) => assert_eq!(n.value, 738594937.0),
+                                    _ => panic!("Expected number value for sku"),
+                                }
+                            }
+                            _ => panic!("Expected object for product"),
+                        }
+                        
+                        // Check second product
+                        match &arr[1].value {
+                            SpannedData::Object(product_pairs) => {
+                                assert_eq!(product_pairs.len(), 2);
+                                
+                                // Check name
+                                assert_eq!(product_pairs[0].0.value, "name");
+                                match &product_pairs[0].1.value {
+                                    SpannedData::String(s) => assert_eq!(s.value, "Nail"),
+                                    _ => panic!("Expected string value for name"),
+                                }
+                                
+                                // Check sku
+                                assert_eq!(product_pairs[1].0.value, "sku");
+                                match &product_pairs[1].1.value {
+                                    SpannedData::Number(n) => assert_eq!(n.value, 284758393.0),
+                                    _ => panic!("Expected number value for sku"),
+                                }
+                            }
+                            _ => panic!("Expected object for product"),
+                        }
+                    }
+                    _ => panic!("Expected array for products"),
+                }
+            }
+            _ => panic!("Expected object"),
+        }
+    }
+    
+    #[test]
+    fn test_parse_empty_document() {
+        let toml = r#""#;
+        let result = Toml.parse(toml, "test.toml");
+        
+        assert!(result.is_ok());
+        let parsed = result.expect("Failed to parse TOML");
+        
+        match parsed.value {
+            SpannedData::Object(pairs) => {
+                assert_eq!(pairs.len(), 0);
+            }
+            _ => panic!("Expected empty object"),
+        }
+    }
+    
+    #[test]
+    fn test_parse_invalid_toml() {
+        let toml = r#"name = "John
+age = 30"#; // Unclosed string
+        let result = Toml.parse(toml, "test.toml");
+        
+        // This should fail
+        assert!(result.is_err());
+    }
+}
