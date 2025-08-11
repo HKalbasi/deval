@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 
-use deval_data_model::{Annotated, AnnotatedData, Span, Spanned, SpannedData};
+use deval_data_model::{Annotated, AnnotatedData, FullAnnotation, Span, Spanned, SpannedData};
 use dyn_clone::DynClone;
 
 pub struct ValidationError {
@@ -54,9 +54,11 @@ impl<T: Clone + Fn(Spanned<SpannedData>) -> Option<String>> std::fmt::Debug for 
     }
 }
 
-impl<T: Clone + Send + Sync + Fn(Spanned<SpannedData>) -> Option<String>> Validator for LambdaValidator<T> {
+impl<T: Clone + Send + Sync + Fn(Spanned<SpannedData>) -> Option<String>> Validator
+    for LambdaValidator<T>
+{
     fn validate(&self, data: Spanned<SpannedData>) -> ValidationResult {
-        let span = data.span.primary();
+        let span = data.annotation.primary();
         if let Some(text) = self.0(data.clone()) {
             return ValidationResult {
                 errors: vec![ValidationError { span, text }],
@@ -76,7 +78,7 @@ impl Validator for NumberValidator {
         let SpannedData::Number(_n) = &data.value else {
             return ValidationResult {
                 errors: vec![ValidationError {
-                    span: data.span.primary(),
+                    span: data.annotation.primary(),
                     text: format!("Expected Number, found {}", data.value.kind()),
                 }],
                 result: data.into(),
@@ -94,7 +96,7 @@ impl Validator for ArrayValidator {
         let SpannedData::Array(items) = data.value else {
             return ValidationResult {
                 errors: vec![ValidationError {
-                    span: data.span.primary(),
+                    span: data.annotation.primary(),
                     text: format!("Expected Object, found {}", data.value.kind()),
                 }],
                 result: data.into(),
@@ -112,9 +114,11 @@ impl Validator for ArrayValidator {
         ValidationResult {
             result: Annotated {
                 value: AnnotatedData::Array(items),
-                span: data.span,
-                docs: String::new(),
-                semantic_type: None,
+                annotation: FullAnnotation {
+                    span: data.annotation,
+                    docs: String::new(),
+                    semantic_type: None,
+                },
             },
             errors,
         }
@@ -135,7 +139,7 @@ impl Validator for ObjectValidator {
         let SpannedData::Object(key_values) = data.value else {
             return ValidationResult {
                 errors: vec![ValidationError {
-                    span: data.span.primary(),
+                    span: data.annotation.primary(),
                     text: format!("Expected Object, found {}", data.value.kind()),
                 }],
                 result: data.into(),
@@ -149,14 +153,14 @@ impl Validator for ObjectValidator {
         for (key, value) in key_values {
             if !visited_keys.insert(key.value.clone()) {
                 errors.push(ValidationError {
-                    span: key.span.primary(),
+                    span: key.annotation.primary(),
                     text: format!("Duplicate key {}", key.value),
                 });
             }
 
             let Some((_, validator)) = self.0.iter().find(|x| x.0 == key.value) else {
                 errors.push(ValidationError {
-                    span: key.span.primary(),
+                    span: key.annotation.primary(),
                     text: format!("Unexpected key {}", key.value),
                 });
                 continue;
@@ -168,7 +172,7 @@ impl Validator for ObjectValidator {
         for mandatory_key in self.mandatory_keys() {
             if !visited_keys.contains(mandatory_key) {
                 errors.push(ValidationError {
-                    span: data.span.primary(),
+                    span: data.annotation.primary(),
                     text: format!("Missing key {}", mandatory_key),
                 });
             }
@@ -177,9 +181,11 @@ impl Validator for ObjectValidator {
         ValidationResult {
             result: Annotated {
                 value: AnnotatedData::Object(result),
-                span: data.span,
-                docs: String::new(),
-                semantic_type: None,
+                annotation: FullAnnotation {
+                    span: data.annotation,
+                    docs: String::new(),
+                    semantic_type: None,
+                },
             },
             errors,
         }

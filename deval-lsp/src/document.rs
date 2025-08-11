@@ -30,7 +30,7 @@ impl Document {
             Err(_) => {
                 self.annotated = None;
                 return;
-            },
+            }
         };
         let annotated = self.schema.validate(parsed).result;
         self.annotated = Some(annotated);

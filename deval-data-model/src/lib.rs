@@ -18,21 +18,8 @@ impl SpanSet {
     }
 }
 
-#[derive(Debug, Clone)]
-pub struct Spanned<T> {
-    pub value: T,
-    pub span: SpanSet,
-}
-
-#[derive(Debug, Clone)]
-pub enum SpannedData {
-    Null,
-    Bool(Spanned<bool>),
-    Number(Spanned<f64>),
-    String(Spanned<String>),
-    Array(Vec<Spanned<SpannedData>>),
-    Object(Vec<(Spanned<String>, Spanned<SpannedData>)>),
-}
+pub type Spanned<T> = Annotated<T, SpanSet>;
+pub type SpannedData = AnnotatedData<SpanSet>;
 
 impl SpannedData {
     pub fn kind(&self) -> &'static str {
@@ -54,48 +41,74 @@ pub enum SemanticType {
     Variable,
 }
 
-#[derive(Debug)]
-pub struct Annotated<T> {
+#[derive(Debug, Clone)]
+pub struct Annotated<T, A = FullAnnotation> {
     pub value: T,
+    pub annotation: A,
+}
+
+#[derive(Debug, Clone)]
+pub struct FullAnnotation {
     pub span: SpanSet,
     pub docs: String,
     pub semantic_type: Option<SemanticType>,
 }
 
-impl<A, B: From<A>> From<Spanned<A>> for Annotated<B> {
+impl<A, B: From<A>> From<Spanned<A>> for Annotated<B, FullAnnotation> {
     fn from(spanned: Spanned<A>) -> Self {
         Annotated {
             value: spanned.value.into(),
-            span: spanned.span,
-            docs: String::new(),
-            semantic_type: None,
+            annotation: FullAnnotation {
+                span: spanned.annotation,
+                docs: String::new(),
+                semantic_type: None,
+            },
         }
     }
 }
 
-impl<T> Annotated<T> {
-    fn with_semnatic_type(self, semnatic: SemanticType) -> Self {
-        Self {
-            semantic_type: Some(semnatic),
-            ..self
+impl<T> Annotated<T, FullAnnotation> {
+    fn with_semnatic_type(mut self, semnatic: SemanticType) -> Self {
+        self.annotation.semantic_type = Some(semnatic);
+        self
+    }
+}
+
+impl<A> Annotated<AnnotatedData<A>, A> {
+    pub fn discard_annotation(&self) -> Annotated<AnnotatedData<()>, ()> {
+        Annotated {
+            value: self.value.discard_annotation(),
+            annotation: (),
         }
     }
 }
 
-#[derive(Debug)]
-pub enum AnnotatedData {
+impl<T: Clone, A> Annotated<T, A> {
+    pub fn discard_annotation_shallow(&self) -> Annotated<T, ()> {
+        Annotated {
+            value: self.value.clone(),
+            annotation: (),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum AnnotatedData<A = FullAnnotation> {
     Null,
-    Bool(Annotated<bool>),
-    Number(Annotated<f64>),
-    String(Annotated<String>),
-    Array(Vec<Annotated<AnnotatedData>>),
-    Object(Vec<(Annotated<String>, Annotated<AnnotatedData>)>),
+    Bool(Annotated<bool, A>),
+    Number(Annotated<f64, A>),
+    String(Annotated<String, A>),
+    Array(Vec<Annotated<AnnotatedData<A>, A>>),
+    Object(Vec<(Annotated<String, A>, Annotated<AnnotatedData<A>, A>)>),
 }
 
-impl AnnotatedData {
-    pub fn walk(&self, f: &mut impl FnMut(SpanSet, &str, Option<SemanticType>)) {
-        fn for_annotated<T>(t: &Annotated<T>, f: &mut impl FnMut(SpanSet, &str, Option<SemanticType>)) {
-            f(t.span.clone(), &t.docs, t.semantic_type);
+impl<A> AnnotatedData<A> {
+    pub fn walk(&self, f: &mut impl FnMut(A))
+    where
+        A: Clone,
+    {
+        fn for_annotated<T, A: Clone>(t: &Annotated<T, A>, f: &mut impl FnMut(A)) {
+            f(t.annotation.clone());
         }
         match self {
             AnnotatedData::Null => (),
@@ -107,25 +120,53 @@ impl AnnotatedData {
                     for_annotated(item, f);
                     item.value.walk(f);
                 }
-            },
+            }
             AnnotatedData::Object(items) => {
                 for (key, value) in items {
                     for_annotated(key, f);
                     for_annotated(value, f);
                     value.value.walk(f);
                 }
-            },
+            }
+        }
+    }
+
+    fn discard_annotation(&self) -> AnnotatedData<()> {
+        match self {
+            AnnotatedData::Null => AnnotatedData::Null,
+            AnnotatedData::Bool(annotated) => {
+                AnnotatedData::Bool(annotated.discard_annotation_shallow())
+            }
+            AnnotatedData::Number(annotated) => {
+                AnnotatedData::Number(annotated.discard_annotation_shallow())
+            }
+            AnnotatedData::String(annotated) => {
+                AnnotatedData::String(annotated.discard_annotation_shallow())
+            }
+            AnnotatedData::Array(annotateds) => {
+                AnnotatedData::Array(annotateds.iter().map(|x| x.discard_annotation()).collect())
+            }
+            AnnotatedData::Object(items) => AnnotatedData::Object(
+                items
+                    .iter()
+                    .map(|x| (x.0.discard_annotation_shallow(), x.1.discard_annotation()))
+                    .collect(),
+            ),
         }
     }
 }
 
-impl From<SpannedData> for AnnotatedData {
+impl From<SpannedData> for AnnotatedData<FullAnnotation> {
     fn from(value: SpannedData) -> Self {
         match value {
             SpannedData::Null => AnnotatedData::Null,
             SpannedData::Bool(spanned) => AnnotatedData::Bool(Annotated::from(spanned)),
-            SpannedData::Number(spanned) => AnnotatedData::Number(Annotated::from(spanned).with_semnatic_type(SemanticType::Number)),
-            SpannedData::String(spanned) => AnnotatedData::String(Annotated::from(spanned).with_semnatic_type(SemanticType::String)),
+            SpannedData::Number(spanned) => AnnotatedData::Number(
+                Annotated::from(spanned).with_semnatic_type(SemanticType::Number),
+            ),
+            SpannedData::String(spanned) => AnnotatedData::String(
+                Annotated::from(spanned).with_semnatic_type(SemanticType::String),
+            ),
             SpannedData::Array(spanneds) => {
                 AnnotatedData::Array(spanneds.into_iter().map(|x| x.into()).collect())
             }

@@ -21,7 +21,7 @@ impl Format for Toml {
                 span: make_span(&root_node, filename),
             });
         }
-        
+
         let mut root_data = SpannedData::Object(Vec::new());
 
         // Iterate through all top-level nodes in the document.
@@ -31,11 +31,12 @@ impl Format for Toml {
                 // A key-value pair at the top level.
                 "pair" => {
                     if let SpannedData::Object(pairs) = &mut root_data {
-                        if let Some((key, value)) = parse_pair(&node, source, filename, &mut errors) {
+                        if let Some((key, value)) = parse_pair(&node, source, filename, &mut errors)
+                        {
                             if pairs.iter().any(|(k, _)| k.value == key.value) {
                                 errors.push(ParseError {
                                     message: format!("Duplicate key '{}' at top level", key.value),
-                                    span: key.span.primary(),
+                                    span: key.annotation.primary(),
                                 });
                             } else {
                                 pairs.push((key, value));
@@ -49,7 +50,10 @@ impl Format for Toml {
                     let key_node = match node.child(1) {
                         Some(n) => n,
                         None => {
-                            errors.push(ParseError { message: "Table without a name".to_string(), span: make_span(&node, filename) });
+                            errors.push(ParseError {
+                                message: "Table without a name".to_string(),
+                                span: make_span(&node, filename),
+                            });
                             continue;
                         }
                     };
@@ -57,16 +61,27 @@ impl Format for Toml {
                     let key_parts: Vec<&str> = key_path.split('.').collect();
 
                     // Get the target table, creating it if it doesn't exist.
-                    if let Some(target_pairs) = get_or_insert_table(&mut root_data, &key_parts, &node, filename, &mut errors) {
+                    if let Some(target_pairs) = get_or_insert_table(
+                        &mut root_data,
+                        &key_parts,
+                        &node,
+                        filename,
+                        &mut errors,
+                    ) {
                         // Now, parse all pairs that are *children* of this table node.
                         let mut table_cursor = node.walk();
                         for child in node.children(&mut table_cursor) {
                             if child.kind() == "pair" {
-                                if let Some((key, value)) = parse_pair(&child, source, filename, &mut errors) {
+                                if let Some((key, value)) =
+                                    parse_pair(&child, source, filename, &mut errors)
+                                {
                                     if target_pairs.iter().any(|(k, _)| k.value == key.value) {
                                         errors.push(ParseError {
-                                            message: format!("Duplicate key '{}' in table '{}'", key.value, key_path),
-                                            span: key.span.primary(),
+                                            message: format!(
+                                                "Duplicate key '{}' in table '{}'",
+                                                key.value, key_path
+                                            ),
+                                            span: key.annotation.primary(),
                                         });
                                     } else {
                                         target_pairs.push((key, value));
@@ -82,7 +97,10 @@ impl Format for Toml {
                     let key_node = match node.child(1) {
                         Some(n) => n,
                         None => {
-                            errors.push(ParseError { message: "Array table without a name".to_string(), span: make_span(&node, filename) });
+                            errors.push(ParseError {
+                                message: "Array table without a name".to_string(),
+                                span: make_span(&node, filename),
+                            });
                             continue;
                         }
                     };
@@ -90,16 +108,27 @@ impl Format for Toml {
                     let key_parts: Vec<&str> = key_path.split('.').collect();
 
                     // Append a new table to the array and get a reference to its pairs.
-                    if let Some(target_pairs) = append_to_array_of_tables(&mut root_data, &key_parts, &node, filename, &mut errors) {
+                    if let Some(target_pairs) = append_to_array_of_tables(
+                        &mut root_data,
+                        &key_parts,
+                        &node,
+                        filename,
+                        &mut errors,
+                    ) {
                         // Parse all pairs that are *children* of this array table node.
                         let mut array_table_cursor = node.walk();
-                         for child in node.children(&mut array_table_cursor) {
+                        for child in node.children(&mut array_table_cursor) {
                             if child.kind() == "pair" {
-                                if let Some((key, value)) = parse_pair(&child, source, filename, &mut errors) {
-                                     if target_pairs.iter().any(|(k, _)| k.value == key.value) {
+                                if let Some((key, value)) =
+                                    parse_pair(&child, source, filename, &mut errors)
+                                {
+                                    if target_pairs.iter().any(|(k, _)| k.value == key.value) {
                                         errors.push(ParseError {
-                                            message: format!("Duplicate key '{}' in table '{}'", key.value, key_path),
-                                            span: key.span.primary(),
+                                            message: format!(
+                                                "Duplicate key '{}' in table '{}'",
+                                                key.value, key_path
+                                            ),
+                                            span: key.annotation.primary(),
                                         });
                                     } else {
                                         target_pairs.push((key, value));
@@ -113,7 +142,7 @@ impl Format for Toml {
                 "comment" | "\n" => {}
                 _ => {
                     if !node.is_extra() {
-                         errors.push(ParseError {
+                        errors.push(ParseError {
                             message: format!("Unexpected top-level TOML node: {}", node.kind()),
                             span: make_span(&node, filename),
                         });
@@ -127,7 +156,7 @@ impl Format for Toml {
         } else {
             Ok(Spanned {
                 value: root_data,
-                span: make_span_vec(&root_node, filename),
+                annotation: make_span_vec(&root_node, filename),
             })
         }
     }
@@ -160,19 +189,25 @@ fn get_or_insert_table<'a>(
             let (found_key, found_value) = &mut current_table_pairs[index];
             // Don't add a span if it's for an implicitly created table.
             if !table_header_node.is_extra() {
-                found_key.span.0.push(make_span(table_header_node, filename));
-                found_value.span.0.push(make_span(table_header_node, filename));
+                found_key
+                    .annotation
+                    .0
+                    .push(make_span(table_header_node, filename));
+                found_value
+                    .annotation
+                    .0
+                    .push(make_span(table_header_node, filename));
             }
             current_data = &mut found_value.value;
         } else {
             let new_table = SpannedData::Object(Vec::new());
             let new_spanned_table = Spanned {
                 value: new_table,
-                span: make_span_vec(table_header_node, filename),
+                annotation: make_span_vec(table_header_node, filename),
             };
             let new_spanned_key = Spanned {
                 value: key.to_string(),
-                span: make_span_vec(table_header_node, filename),
+                annotation: make_span_vec(table_header_node, filename),
             };
 
             current_table_pairs.push((new_spanned_key, new_spanned_table));
@@ -183,7 +218,7 @@ fn get_or_insert_table<'a>(
     if let SpannedData::Object(pairs) = current_data {
         Some(pairs)
     } else {
-         errors.push(ParseError {
+        errors.push(ParseError {
             message: format!("Cannot define table '{}' because a key with this name was already defined as a non-table.", path.join(".")),
             span: make_span(table_header_node, filename),
         });
@@ -191,8 +226,7 @@ fn get_or_insert_table<'a>(
     }
 }
 
-
-/// Finds or creates an array of tables at the specified path and returns a mutable reference 
+/// Finds or creates an array of tables at the specified path and returns a mutable reference
 /// to a new table element appended to it.
 fn append_to_array_of_tables<'a>(
     current_data: &'a mut SpannedData,
@@ -203,15 +237,26 @@ fn append_to_array_of_tables<'a>(
 ) -> Option<&'a mut Vec<(Spanned<String>, Spanned<SpannedData>)>> {
     let (array_key, table_path) = path.split_last()?;
 
-    let parent_table = get_or_insert_table(current_data, table_path, array_header_node, filename, errors)?;
+    let parent_table = get_or_insert_table(
+        current_data,
+        table_path,
+        array_header_node,
+        filename,
+        errors,
+    )?;
 
     let found_index = parent_table.iter().position(|(k, _)| k.value == *array_key);
-    
+
     let array = match found_index {
         Some(index) => {
             let (key, spanned_value) = &mut parent_table[index];
-            key.span.0.push(make_span(array_header_node, filename));
-            spanned_value.span.0.push(make_span(array_header_node, filename));
+            key.annotation
+                .0
+                .push(make_span(array_header_node, filename));
+            spanned_value
+                .annotation
+                .0
+                .push(make_span(array_header_node, filename));
             if let SpannedData::Array(arr) = &mut spanned_value.value {
                 arr
             } else {
@@ -224,33 +269,38 @@ fn append_to_array_of_tables<'a>(
         }
         None => {
             parent_table.push((
-                 Spanned {
+                Spanned {
                     value: array_key.to_string(),
-                    span: make_span_vec(array_header_node, filename),
+                    annotation: make_span_vec(array_header_node, filename),
                 },
-                 Spanned {
+                Spanned {
                     value: SpannedData::Array(Vec::new()),
-                    span: make_span_vec(array_header_node, filename),
+                    annotation: make_span_vec(array_header_node, filename),
                 },
             ));
             if let SpannedData::Array(arr) = &mut parent_table.last_mut().unwrap().1.value {
                 arr
-            } else { unreachable!() }
+            } else {
+                unreachable!()
+            }
         }
     };
 
     array.push(Spanned {
         value: SpannedData::Object(Vec::new()),
-        span: make_span_vec(array_header_node, filename),
+        annotation: make_span_vec(array_header_node, filename),
     });
 
-    if let Some(Spanned { value: SpannedData::Object(pairs), .. }) = array.last_mut() {
+    if let Some(Spanned {
+        value: SpannedData::Object(pairs),
+        ..
+    }) = array.last_mut()
+    {
         Some(pairs)
     } else {
         None
     }
 }
-
 
 /// Parses a single key-value pair node.
 fn parse_pair(
@@ -269,15 +319,14 @@ fn parse_pair(
     Some((
         Spanned {
             value: key_text,
-            span: make_span_vec(&key_node, filename),
+            annotation: make_span_vec(&key_node, filename),
         },
         Spanned {
             value: value_data,
-            span: make_span_vec(&value_node, filename),
+            annotation: make_span_vec(&value_node, filename),
         },
     ))
 }
-
 
 /// Recursively parses a tree-sitter node representing a VALUE into SpannedData.
 fn parse_value(
@@ -300,7 +349,7 @@ fn parse_value(
             let content = unquote_toml_string(text);
             Some(SpannedData::String(Spanned {
                 value: content,
-                span: make_span_vec(node, filename),
+                annotation: make_span_vec(node, filename),
             }))
         }
         "integer" | "float" => {
@@ -308,7 +357,7 @@ fn parse_value(
             match text.replace('_', "").parse::<f64>() {
                 Ok(num) => Some(SpannedData::Number(Spanned {
                     value: num,
-                    span: make_span_vec(node, filename),
+                    annotation: make_span_vec(node, filename),
                 })),
                 Err(e) => {
                     errors.push(ParseError {
@@ -321,13 +370,13 @@ fn parse_value(
         }
         "boolean" => Some(SpannedData::Bool(Spanned {
             value: node.utf8_text(source.as_bytes()).unwrap() == "true",
-            span: make_span_vec(node, filename),
+            annotation: make_span_vec(node, filename),
         })),
         "date_time" => {
             let text = node.utf8_text(source.as_bytes()).unwrap().to_string();
             Some(SpannedData::String(Spanned {
                 value: text,
-                span: make_span_vec(node, filename),
+                annotation: make_span_vec(node, filename),
             }))
         }
         "array" => {
@@ -337,7 +386,7 @@ fn parse_value(
                 if let Some(value) = parse_value(&child, source, filename, errors) {
                     children.push(Spanned {
                         value,
-                        span: make_span_vec(&child, filename),
+                        annotation: make_span_vec(&child, filename),
                     });
                 }
             }
@@ -364,7 +413,6 @@ fn parse_value(
         }
     }
 }
-
 
 /// Creates a `Span` from a `tree_sitter::Node`.
 fn make_span(node: &Node, filename: &str) -> Span {
@@ -401,16 +449,16 @@ fn unquote_toml_string(text: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use deval_data_model::{Format, Spanned, SpannedData};
-    
+    use deval_data_model::{Format, SpannedData};
+
     #[test]
     fn test_parse_simple_key_value() {
         let toml = r#"name = "John Doe""#;
         let result = Toml.parse(toml, "test.toml");
-        
+
         assert!(result.is_ok());
         let parsed = result.expect("Failed to parse TOML");
-        
+
         match parsed.value {
             SpannedData::Object(pairs) => {
                 assert_eq!(pairs.len(), 1);
@@ -423,27 +471,27 @@ mod tests {
             _ => panic!("Expected object"),
         }
     }
-    
+
     #[test]
     fn test_parse_numbers() {
         let toml = r#"age = 30
 height = 5.9"#;
         let result = Toml.parse(toml, "test.toml");
-        
+
         assert!(result.is_ok());
         let parsed = result.expect("Failed to parse TOML");
-        
+
         match parsed.value {
             SpannedData::Object(pairs) => {
                 assert_eq!(pairs.len(), 2);
-                
+
                 // Check age
                 assert_eq!(pairs[0].0.value, "age");
                 match &pairs[0].1.value {
                     SpannedData::Number(n) => assert_eq!(n.value, 30.0),
                     _ => panic!("Expected number value for age"),
                 }
-                
+
                 // Check height
                 assert_eq!(pairs[1].0.value, "height");
                 match &pairs[1].1.value {
@@ -454,27 +502,27 @@ height = 5.9"#;
             _ => panic!("Expected object"),
         }
     }
-    
+
     #[test]
     fn test_parse_booleans() {
         let toml = r#"is_active = true
 is_deleted = false"#;
         let result = Toml.parse(toml, "test.toml");
-        
+
         assert!(result.is_ok());
         let parsed = result.expect("Failed to parse TOML");
-        
+
         match parsed.value {
             SpannedData::Object(pairs) => {
                 assert_eq!(pairs.len(), 2);
-                
+
                 // Check is_active
                 assert_eq!(pairs[0].0.value, "is_active");
                 match &pairs[0].1.value {
                     SpannedData::Bool(b) => assert_eq!(b.value, true),
                     _ => panic!("Expected boolean true"),
                 }
-                
+
                 // Check is_deleted
                 assert_eq!(pairs[1].0.value, "is_deleted");
                 match &pairs[1].1.value {
@@ -485,20 +533,20 @@ is_deleted = false"#;
             _ => panic!("Expected object"),
         }
     }
-    
+
     #[test]
     fn test_parse_arrays() {
         let toml = r#"numbers = [1, 2, 3]
 names = ["Alice", "Bob"]"#;
         let result = Toml.parse(toml, "test.toml");
-        
+
         assert!(result.is_ok());
         let parsed = result.expect("Failed to parse TOML");
-        
+
         match parsed.value {
             SpannedData::Object(pairs) => {
                 assert_eq!(pairs.len(), 2);
-                
+
                 // Check numbers array
                 assert_eq!(pairs[0].0.value, "numbers");
                 match &pairs[0].1.value {
@@ -513,7 +561,7 @@ names = ["Alice", "Bob"]"#;
                     }
                     _ => panic!("Expected array for numbers"),
                 }
-                
+
                 // Check names array
                 assert_eq!(pairs[1].0.value, "names");
                 match &pairs[1].1.value {
@@ -534,31 +582,31 @@ names = ["Alice", "Bob"]"#;
             _ => panic!("Expected object"),
         }
     }
-    
+
     #[test]
     fn test_parse_inline_tables() {
         let toml = r#"point = { x = 1, y = 2 }"#;
         let result = Toml.parse(toml, "test.toml");
-        
+
         assert!(result.is_ok());
         let parsed = result.expect("Failed to parse TOML");
-        
+
         match parsed.value {
             SpannedData::Object(pairs) => {
                 assert_eq!(pairs.len(), 1);
                 assert_eq!(pairs[0].0.value, "point");
-                
+
                 match &pairs[0].1.value {
                     SpannedData::Object(inner_pairs) => {
                         assert_eq!(inner_pairs.len(), 2);
-                        
+
                         // Check x field
                         assert_eq!(inner_pairs[0].0.value, "x");
                         match &inner_pairs[0].1.value {
                             SpannedData::Number(n) => assert_eq!(n.value, 1.0),
                             _ => panic!("Expected number value for x"),
                         }
-                        
+
                         // Check y field
                         assert_eq!(inner_pairs[1].0.value, "y");
                         match &inner_pairs[1].1.value {
@@ -572,33 +620,33 @@ names = ["Alice", "Bob"]"#;
             _ => panic!("Expected object"),
         }
     }
-    
+
     #[test]
     fn test_parse_tables() {
         let toml = r#"[person]
 name = "Alice"
 age = 25"#;
         let result = Toml.parse(toml, "test.toml");
-        
+
         assert!(result.is_ok());
         let parsed = result.expect("Failed to parse TOML");
-        
+
         match parsed.value {
             SpannedData::Object(pairs) => {
                 assert_eq!(pairs.len(), 1);
                 assert_eq!(pairs[0].0.value, "person");
-                
+
                 match &pairs[0].1.value {
                     SpannedData::Object(inner_pairs) => {
                         assert_eq!(inner_pairs.len(), 2);
-                        
+
                         // Check name field
                         assert_eq!(inner_pairs[0].0.value, "name");
                         match &inner_pairs[0].1.value {
                             SpannedData::String(s) => assert_eq!(s.value, "Alice"),
                             _ => panic!("Expected string value for name"),
                         }
-                        
+
                         // Check age field
                         assert_eq!(inner_pairs[1].0.value, "age");
                         match &inner_pairs[1].1.value {
@@ -612,7 +660,7 @@ age = 25"#;
             _ => panic!("Expected object"),
         }
     }
-    
+
     #[test]
     fn test_parse_array_of_tables() {
         let toml = r#"[[products]]
@@ -623,31 +671,31 @@ sku = 738594937
 name = "Nail"
 sku = 284758393"#;
         let result = Toml.parse(toml, "test.toml");
-        
+
         assert!(result.is_ok());
         let parsed = result.expect("Failed to parse TOML");
-        
+
         match parsed.value {
             SpannedData::Object(pairs) => {
                 assert_eq!(pairs.len(), 1);
                 assert_eq!(pairs[0].0.value, "products");
-                
+
                 match &pairs[0].1.value {
                     SpannedData::Array(arr) => {
                         assert_eq!(arr.len(), 2);
-                        
+
                         // Check first product
                         match &arr[0].value {
                             SpannedData::Object(product_pairs) => {
                                 assert_eq!(product_pairs.len(), 2);
-                                
+
                                 // Check name
                                 assert_eq!(product_pairs[0].0.value, "name");
                                 match &product_pairs[0].1.value {
                                     SpannedData::String(s) => assert_eq!(s.value, "Hammer"),
                                     _ => panic!("Expected string value for name"),
                                 }
-                                
+
                                 // Check sku
                                 assert_eq!(product_pairs[1].0.value, "sku");
                                 match &product_pairs[1].1.value {
@@ -657,19 +705,19 @@ sku = 284758393"#;
                             }
                             _ => panic!("Expected object for product"),
                         }
-                        
+
                         // Check second product
                         match &arr[1].value {
                             SpannedData::Object(product_pairs) => {
                                 assert_eq!(product_pairs.len(), 2);
-                                
+
                                 // Check name
                                 assert_eq!(product_pairs[0].0.value, "name");
                                 match &product_pairs[0].1.value {
                                     SpannedData::String(s) => assert_eq!(s.value, "Nail"),
                                     _ => panic!("Expected string value for name"),
                                 }
-                                
+
                                 // Check sku
                                 assert_eq!(product_pairs[1].0.value, "sku");
                                 match &product_pairs[1].1.value {
@@ -686,15 +734,15 @@ sku = 284758393"#;
             _ => panic!("Expected object"),
         }
     }
-    
+
     #[test]
     fn test_parse_empty_document() {
         let toml = r#""#;
         let result = Toml.parse(toml, "test.toml");
-        
+
         assert!(result.is_ok());
         let parsed = result.expect("Failed to parse TOML");
-        
+
         match parsed.value {
             SpannedData::Object(pairs) => {
                 assert_eq!(pairs.len(), 0);
@@ -702,13 +750,13 @@ sku = 284758393"#;
             _ => panic!("Expected empty object"),
         }
     }
-    
+
     #[test]
     fn test_parse_invalid_toml() {
         let toml = r#"name = "John
 age = 30"#; // Unclosed string
         let result = Toml.parse(toml, "test.toml");
-        
+
         // This should fail
         assert!(result.is_err());
     }

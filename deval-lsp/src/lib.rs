@@ -139,9 +139,9 @@ impl LanguageServer for Backend {
         let mut prev_line = 0;
         let mut prev_col = 0;
 
-        data.value.walk(&mut |span, _, semantic| {
-            let span = span.primary();
-            let token_type = match semantic {
+        data.value.walk(&mut |annotation| {
+            let span = annotation.span.primary();
+            let token_type = match annotation.semantic_type {
                 Some(SemanticType::Number) => 19,
                 Some(SemanticType::String) => 18,
                 Some(SemanticType::Variable) => 8,

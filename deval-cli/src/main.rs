@@ -139,7 +139,7 @@ fn load_config() -> DevalConfig {
         panic!();
     });
     let annotated = AnyValidator.validate(spanned);
-    deval_serde::deserialize_from_annotated(&annotated.result)
+    deval_serde::deserialize_from_annotated(&annotated.result.discard_annotation())
 }
 
 fn main() {

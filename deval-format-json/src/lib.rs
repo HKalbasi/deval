@@ -7,9 +7,7 @@ impl Format for Json {
     fn parse(&self, source: &str, filename: &str) -> Result<Spanned<SpannedData>, Vec<ParseError>> {
         // Initialize tree-sitter JSON parser
         let mut parser = Parser::new();
-        parser
-            .set_language(tree_sitter_json::language())
-            .unwrap();
+        parser.set_language(tree_sitter_json::language()).unwrap();
 
         let tree = parser.parse(source, None).unwrap();
         let root_node = tree.root_node();
@@ -19,7 +17,7 @@ impl Format for Json {
 
         let result = result.map(|x| Spanned {
             value: x,
-            span: make_span_vec(&root_node, filename),
+            annotation: make_span_vec(&root_node, filename),
         });
 
         if !errors.is_empty() {
@@ -40,14 +38,14 @@ fn parse_value(
         "null" => Some(SpannedData::Null),
         "false" | "true" => Some(SpannedData::Bool(Spanned {
             value: node.kind() == "true",
-            span: make_span_vec(node, filename),
+            annotation: make_span_vec(node, filename),
         })),
         "number" => {
             let text = node.utf8_text(source.as_bytes()).ok()?;
             match text.parse::<f64>() {
                 Ok(num) => Some(SpannedData::Number(Spanned {
                     value: num,
-                    span: make_span_vec(node, filename),
+                    annotation: make_span_vec(node, filename),
                 })),
                 Err(e) => {
                     errors.push(ParseError {
@@ -64,7 +62,7 @@ fn parse_value(
             let content = text[1..text.len() - 1].to_string();
             Some(SpannedData::String(Spanned {
                 value: content,
-                span: make_span_vec(node, filename),
+                annotation: make_span_vec(node, filename),
             }))
         }
         "array" => {
@@ -78,7 +76,7 @@ fn parse_value(
                 let value = parse_value(&child, source, filename, errors)?;
                 children.push(Spanned {
                     value,
-                    span: make_span_vec(&child, filename),
+                    annotation: make_span_vec(&child, filename),
                 });
             }
 
@@ -102,11 +100,11 @@ fn parse_value(
                         pairs.push((
                             Spanned {
                                 value: key,
-                                span: make_span_vec(&key_node, filename),
+                                annotation: make_span_vec(&key_node, filename),
                             },
                             Spanned {
                                 value,
-                                span: make_span_vec(&value_node, filename),
+                                annotation: make_span_vec(&value_node, filename),
                             },
                         ));
                     }
@@ -141,11 +139,7 @@ fn parse_value(
     }
 }
 
-fn parse_string_value(
-    node: &Node,
-    source: &str,
-    errors: &mut Vec<ParseError>,
-) -> Option<String> {
+fn parse_string_value(node: &Node, source: &str, errors: &mut Vec<ParseError>) -> Option<String> {
     if node.kind() != "string" {
         errors.push(ParseError {
             message: format!("Expected string, got {}", node.kind()),
@@ -158,7 +152,6 @@ fn parse_string_value(
     // Remove quotes
     Some(text[1..text.len() - 1].to_string())
 }
-
 
 /// Creates a `Span` from a `tree_sitter::Node`.
 fn make_span(node: &Node, filename: &str) -> Span {
@@ -177,27 +170,27 @@ fn make_span_vec(node: &Node, filename: &str) -> SpanSet {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use deval_data_model::{Format, Spanned, SpannedData};
-    
+    use deval_data_model::{Format, SpannedData};
+
     #[test]
     fn test_parse_simple_object() {
         let json = r#"{"name": "John", "age": 30}"#;
         let result = Json.parse(json, "test.json");
-        
+
         assert!(result.is_ok());
         let parsed = result.expect("Failed to parse JSON");
-        
+
         match parsed.value {
             SpannedData::Object(pairs) => {
                 assert_eq!(pairs.len(), 2);
-                
+
                 // Check name field
                 assert_eq!(pairs[0].0.value, "name");
                 match &pairs[0].1.value {
                     SpannedData::String(s) => assert_eq!(s.value, "John"),
                     _ => panic!("Expected string value for name"),
                 }
-                
+
                 // Check age field
                 assert_eq!(pairs[1].0.value, "age");
                 match &pairs[1].1.value {
@@ -208,15 +201,15 @@ mod tests {
             _ => panic!("Expected object"),
         }
     }
-    
+
     #[test]
     fn test_parse_array() {
         let json = r#"[1, 2, 3]"#;
         let result = Json.parse(json, "test.json");
-        
+
         assert!(result.is_ok());
         let parsed = result.expect("Failed to parse JSON");
-        
+
         match parsed.value {
             SpannedData::Array(items) => {
                 assert_eq!(items.len(), 3);
@@ -230,31 +223,31 @@ mod tests {
             _ => panic!("Expected array"),
         }
     }
-    
+
     #[test]
     fn test_parse_nested_object() {
         let json = r#"{"person": {"name": "Alice", "age": 25}}"#;
         let result = Json.parse(json, "test.json");
-        
+
         assert!(result.is_ok());
         let parsed = result.expect("Failed to parse JSON");
-        
+
         match parsed.value {
             SpannedData::Object(pairs) => {
                 assert_eq!(pairs.len(), 1);
                 assert_eq!(pairs[0].0.value, "person");
-                
+
                 match &pairs[0].1.value {
                     SpannedData::Object(inner_pairs) => {
                         assert_eq!(inner_pairs.len(), 2);
-                        
+
                         // Check name field
                         assert_eq!(inner_pairs[0].0.value, "name");
                         match &inner_pairs[0].1.value {
                             SpannedData::String(s) => assert_eq!(s.value, "Alice"),
                             _ => panic!("Expected string value for name"),
                         }
-                        
+
                         // Check age field
                         assert_eq!(inner_pairs[1].0.value, "age");
                         match &inner_pairs[1].1.value {
@@ -268,57 +261,57 @@ mod tests {
             _ => panic!("Expected object"),
         }
     }
-    
+
     #[test]
     fn test_parse_boolean_and_null() {
         let json = r#"{"active": true, "deleted": false, "value": null}"#;
         let result = Json.parse(json, "test.json");
-        
+
         assert!(result.is_ok());
         let parsed = result.expect("Failed to parse JSON");
-        
+
         match parsed.value {
             SpannedData::Object(pairs) => {
                 assert_eq!(pairs.len(), 3);
-                
+
                 // Check active field (true)
                 assert_eq!(pairs[0].0.value, "active");
                 match &pairs[0].1.value {
                     SpannedData::Bool(b) => assert_eq!(b.value, true),
                     _ => panic!("Expected boolean true"),
                 }
-                
+
                 // Check deleted field (false)
                 assert_eq!(pairs[1].0.value, "deleted");
                 match &pairs[1].1.value {
                     SpannedData::Bool(b) => assert_eq!(b.value, false),
                     _ => panic!("Expected boolean false"),
                 }
-                
+
                 // Check value field (null)
                 assert_eq!(pairs[2].0.value, "value");
                 match &pairs[2].1.value {
-                    SpannedData::Null => {}, // Correct
+                    SpannedData::Null => {} // Correct
                     _ => panic!("Expected null value"),
                 }
             }
             _ => panic!("Expected object"),
         }
     }
-    
+
     #[test]
     fn test_parse_float_number() {
         let json = r#"{"price": 19.99}"#;
         let result = Json.parse(json, "test.json");
-        
+
         assert!(result.is_ok());
         let parsed = result.expect("Failed to parse JSON");
-        
+
         match parsed.value {
             SpannedData::Object(pairs) => {
                 assert_eq!(pairs.len(), 1);
                 assert_eq!(pairs[0].0.value, "price");
-                
+
                 match &pairs[0].1.value {
                     SpannedData::Number(n) => assert_eq!(n.value, 19.99),
                     _ => panic!("Expected number value"),
@@ -327,15 +320,15 @@ mod tests {
             _ => panic!("Expected object"),
         }
     }
-    
+
     #[test]
     fn test_parse_empty_object() {
         let json = r#"{}"#;
         let result = Json.parse(json, "test.json");
-        
+
         assert!(result.is_ok());
         let parsed = result.expect("Failed to parse JSON");
-        
+
         match parsed.value {
             SpannedData::Object(pairs) => {
                 assert_eq!(pairs.len(), 0);
@@ -343,15 +336,15 @@ mod tests {
             _ => panic!("Expected empty object"),
         }
     }
-    
+
     #[test]
     fn test_parse_empty_array() {
         let json = r#"[]"#;
         let result = Json.parse(json, "test.json");
-        
+
         assert!(result.is_ok());
         let parsed = result.expect("Failed to parse JSON");
-        
+
         match parsed.value {
             SpannedData::Array(items) => {
                 assert_eq!(items.len(), 0);
@@ -359,12 +352,12 @@ mod tests {
             _ => panic!("Expected empty array"),
         }
     }
-    
+
     #[test]
     fn test_parse_invalid_json() {
         let json = r#"{"name": "John", "age": 30,}"#; // Trailing comma not allowed in JSON
         let result = Json.parse(json, "test.json");
-        
+
         // This should fail
         assert!(result.is_err());
     }
