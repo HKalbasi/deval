@@ -19,8 +19,8 @@ struct Backend<F> {
     schema_finder: F,
 }
 
-impl<F: Fn(&Path) -> Option<(Arc<dyn Format>, Arc<dyn Validator>)> + Send + Sync + 'static> LanguageServer
-    for Backend<F>
+impl<F: Fn(&Path) -> Option<(Arc<dyn Format>, Arc<dyn Validator>)> + Send + Sync + 'static>
+    LanguageServer for Backend<F>
 {
     async fn initialize(&self, _: InitializeParams) -> Result<InitializeResult> {
         Ok(InitializeResult {
@@ -269,14 +269,16 @@ impl<F: Fn(&Path) -> Option<(Arc<dyn Format>, Arc<dyn Validator>)> + Send + Sync
 
         if let Some(token) = token {
             // Create hover content based on token type
-            let content = match token.token_type {
+            let header = match token.token_type {
                 SemanticType::Number => "Number literal",
                 SemanticType::String => "String literal",
                 SemanticType::Variable => "Variable",
             };
 
+            let data = &token.docs;
+
             return Ok(Some(Hover {
-                contents: HoverContents::Scalar(MarkedString::String(content.to_string())),
+                contents: HoverContents::Scalar(MarkedString::String(format!("{header}\n{data}"))),
                 range: None,
             }));
         }

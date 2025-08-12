@@ -7,20 +7,22 @@ pub struct SemanticToken {
     pub start: usize,
     pub end: usize,
     pub token_type: SemanticType,
+    pub docs: String,
 }
 
 impl SemanticToken {
-    pub fn new(start: usize, end: usize, token_type: SemanticType) -> Self {
+    pub fn new(start: usize, end: usize, token_type: SemanticType, docs: String) -> Self {
         Self {
             start,
             end,
             token_type,
+            docs,
         }
     }
 
     /// Check if this token's span contains the given position
     pub fn contains(&self, pos: usize) -> bool {
-        pos >= self.start && pos < self.end
+        pos >= self.start && pos <= self.end
     }
 
     /// Check if this token's span is contained within the given range
@@ -75,8 +77,12 @@ impl TokenStore {
         annotated.value.walk(&mut |annotation: FullAnnotation| {
             for span in &annotation.span.0 {
                 if let Some(token_type) = annotation.semantic_type {
-                    self.tokens
-                        .push(SemanticToken::new(span.start, span.end, token_type));
+                    self.tokens.push(SemanticToken::new(
+                        span.start,
+                        span.end,
+                        token_type,
+                        annotation.docs.clone(),
+                    ));
                 }
             }
         });
@@ -95,7 +101,7 @@ impl TokenStore {
         // Binary search for the first token that starts at or after pos
         let idx = match self
             .tokens
-            .binary_search_by(|token| token.start.cmp(&pos).then(std::cmp::Ordering::Greater))
+            .binary_search_by(|token| token.start.cmp(&pos).then(std::cmp::Ordering::Less))
         {
             Ok(idx) => idx,
             Err(idx) => idx,

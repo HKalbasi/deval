@@ -167,7 +167,7 @@ impl Validator for ObjectValidator {
                 });
             }
 
-            let Some((key_name, key_docs, validator)) = self.find_validator(&key.value) else {
+            let Some((_, key_docs, validator)) = self.find_validator(&key.value) else {
                 errors.push(ValidationError {
                     span: key.annotation.primary(),
                     text: format!("Unexpected key {}", key.value),
