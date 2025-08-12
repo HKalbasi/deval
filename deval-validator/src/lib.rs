@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 
-use deval_data_model::{Annotated, AnnotatedData, FullAnnotation, Span, Spanned, SpannedData};
+use deval_data_model::{Annotated, AnnotatedData, FullAnnotation, SemanticType, Span, Spanned, SpannedData};
 use dyn_clone::DynClone;
 
 pub struct ValidationError {
@@ -126,11 +126,15 @@ impl Validator for ArrayValidator {
 }
 
 #[derive(Debug, Clone)]
-pub struct ObjectValidator(pub Vec<(String, Box<dyn Validator>)>);
+pub struct ObjectValidator(pub Vec<(String, String, Box<dyn Validator>)>);
 
 impl ObjectValidator {
     fn mandatory_keys(&self) -> impl Iterator<Item = &str> {
         self.0.iter().map(|x| &*x.0)
+    }
+    
+    fn find_validator(&self, key: &str) -> Option<(&String, &String, &Box<dyn Validator>)> {
+        self.0.iter().find(|x| x.0 == key).map(|x| (&x.0, &x.1, &x.2))
     }
 }
 
@@ -158,15 +162,27 @@ impl Validator for ObjectValidator {
                 });
             }
 
-            let Some((_, validator)) = self.0.iter().find(|x| x.0 == key.value) else {
+            let Some((key_name, key_docs, validator)) = self.find_validator(&key.value) else {
                 errors.push(ValidationError {
                     span: key.annotation.primary(),
                     text: format!("Unexpected key {}", key.value),
                 });
                 continue;
             };
+            
             let r = validator.validate(value);
-            result.push((key.into(), r.append_errors_and_return_result(&mut errors)));
+            
+            // Apply documentation to the key
+            let annotated_key = Annotated {
+                value: key.value,
+                annotation: FullAnnotation {
+                    span: key.annotation,
+                    docs: key_docs.clone(),
+                    semantic_type: Some(SemanticType::Variable),
+                },
+            };
+            
+            result.push((annotated_key, r.append_errors_and_return_result(&mut errors)));
         }
 
         for mandatory_key in self.mandatory_keys() {

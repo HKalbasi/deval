@@ -28,7 +28,7 @@ fn compile_ast(
         DataMatcher::Object(record_matchers) => Ok(Box::new(ObjectValidator(
             record_matchers
                 .into_iter()
-                .map(|r| Ok((r.key, compile_ast(r.value, env)?)))
+                .map(|r| Ok((r.key, r.docs, compile_ast(r.value, env)?)))
                 .collect::<Result<_, _>>()?,
         ))),
     }
