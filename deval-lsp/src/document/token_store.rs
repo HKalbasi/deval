@@ -60,9 +60,7 @@ pub struct TokenStore {
 
 impl TokenStore {
     pub fn new() -> Self {
-        Self {
-            tokens: Vec::new(),
-        }
+        Self { tokens: Vec::new() }
     }
 
     /// Build the token store from annotated data

@@ -39,7 +39,7 @@ impl Document {
         };
         let annotated = self.schema.validate(parsed).result;
         self.annotated = Some(annotated.clone());
-        
+
         // Update the token store with the new annotated data
         self.token_store.build_from_annotated(&annotated);
     }

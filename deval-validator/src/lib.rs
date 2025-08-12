@@ -1,6 +1,8 @@
 use std::collections::HashSet;
 
-use deval_data_model::{Annotated, AnnotatedData, FullAnnotation, SemanticType, Span, Spanned, SpannedData};
+use deval_data_model::{
+    Annotated, AnnotatedData, FullAnnotation, SemanticType, Span, Spanned, SpannedData,
+};
 use dyn_clone::DynClone;
 
 pub struct ValidationError {
@@ -132,9 +134,12 @@ impl ObjectValidator {
     fn mandatory_keys(&self) -> impl Iterator<Item = &str> {
         self.0.iter().map(|x| &*x.0)
     }
-    
+
     fn find_validator(&self, key: &str) -> Option<(&String, &String, &Box<dyn Validator>)> {
-        self.0.iter().find(|x| x.0 == key).map(|x| (&x.0, &x.1, &x.2))
+        self.0
+            .iter()
+            .find(|x| x.0 == key)
+            .map(|x| (&x.0, &x.1, &x.2))
     }
 }
 
@@ -169,9 +174,9 @@ impl Validator for ObjectValidator {
                 });
                 continue;
             };
-            
+
             let r = validator.validate(value);
-            
+
             // Apply documentation to the key
             let annotated_key = Annotated {
                 value: key.value,
@@ -181,8 +186,11 @@ impl Validator for ObjectValidator {
                     semantic_type: Some(SemanticType::Variable),
                 },
             };
-            
-            result.push((annotated_key, r.append_errors_and_return_result(&mut errors)));
+
+            result.push((
+                annotated_key,
+                r.append_errors_and_return_result(&mut errors),
+            ));
         }
 
         for mandatory_key in self.mandatory_keys() {

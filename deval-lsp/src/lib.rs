@@ -1,3 +1,4 @@
+use std::path::Path;
 use std::sync::Arc;
 
 use dashmap::DashMap;
@@ -12,14 +13,15 @@ mod document;
 
 use document::Document;
 
-struct Backend {
+struct Backend<F> {
     client: Client,
     documents: DashMap<Uri, Document>,
-    format: Arc<dyn Format>,
-    schema: Arc<dyn Validator>,
+    schema_finder: F,
 }
 
-impl LanguageServer for Backend {
+impl<F: Fn(&Path) -> Option<(Arc<dyn Format>, Arc<dyn Validator>)> + Send + Sync + 'static> LanguageServer
+    for Backend<F>
+{
     async fn initialize(&self, _: InitializeParams) -> Result<InitializeResult> {
         Ok(InitializeResult {
             server_info: Some(ServerInfo {
@@ -90,10 +92,14 @@ impl LanguageServer for Backend {
         let uri = params.text_document.uri;
         let text = params.text_document.text;
 
-        self.documents.insert(
-            uri,
-            Document::new(&text, self.format.clone(), self.schema.clone()),
-        );
+        let path = Path::new(uri.path().as_str());
+
+        let Some((format, schema)) = (self.schema_finder)(path) else {
+            return;
+        };
+
+        self.documents
+            .insert(uri, Document::new(&text, format, schema));
     }
 
     async fn did_change(&self, params: DidChangeTextDocumentParams) {
@@ -102,10 +108,6 @@ impl LanguageServer for Backend {
 
         if let Some(mut doc) = self.documents.get_mut(&uri) {
             doc.update_text(&text);
-        } else {
-            self.client
-                .log_message(MessageType::ERROR, "did change for non-existing file!")
-                .await;
         }
     }
 
@@ -212,7 +214,7 @@ impl LanguageServer for Backend {
             let l = doc
                 .line_index
                 .line_col(TextSize::try_from(token.start).unwrap());
-            
+
             // Convert our internal semantic type to LSP token type
             let token_type = match token.token_type {
                 SemanticType::Number => 19,
@@ -245,7 +247,10 @@ impl LanguageServer for Backend {
     }
 
     async fn hover(&self, params: HoverParams) -> Result<Option<Hover>> {
-        let Some(doc) = self.documents.get(&params.text_document_position_params.text_document.uri) else {
+        let Some(doc) = self
+            .documents
+            .get(&params.text_document_position_params.text_document.uri)
+        else {
             return Ok(None);
         };
 
@@ -261,7 +266,7 @@ impl LanguageServer for Backend {
 
         // Find the smallest token containing this position
         let token = doc.token_store.smallest_token_containing(offset);
-        
+
         if let Some(token) = token {
             // Create hover content based on token type
             let content = match token.token_type {
@@ -269,7 +274,7 @@ impl LanguageServer for Backend {
                 SemanticType::String => "String literal",
                 SemanticType::Variable => "Variable",
             };
-            
+
             return Ok(Some(Hover {
                 contents: HoverContents::Scalar(MarkedString::String(content.to_string())),
                 range: None,
@@ -284,15 +289,19 @@ impl LanguageServer for Backend {
     }
 }
 
-pub async fn start_server(format: Arc<dyn Format>, schema: Arc<dyn Validator>) {
+pub async fn start_server(
+    schema_finder: impl Fn(&Path) -> Option<(Arc<dyn Format>, Arc<dyn Validator>)>
+    + Send
+    + Sync
+    + 'static,
+) {
     let stdin = tokio::io::stdin();
     let stdout = tokio::io::stdout();
 
     let (service, socket) = LspService::new(|client| Backend {
         client,
         documents: DashMap::new(),
-        format,
-        schema,
+        schema_finder,
     });
     Server::new(stdin, stdout, socket).serve(service).await;
 }

@@ -195,12 +195,37 @@ fn main() {
             println!("Input matches the schema!");
         }
         Args::Lsp => {
+            let config = load_config();
+
             tokio::runtime::Builder::new_multi_thread()
                 .enable_all()
                 .build()
                 .expect("Failed building the Runtime")
-                .block_on(async {
-                    deval_lsp::start_server(Arc::new(Toml), Arc::new(AnyValidator)).await;
+                .block_on(async move {
+                    deval_lsp::start_server(move |path| {
+                        let format: Arc<dyn Format> =
+                            match path.extension().and_then(|x| x.to_str()) {
+                                Some("json") => Arc::new(Json),
+                                Some("toml") => Arc::new(Toml),
+                                Some(_) => return None,
+                                None => return None,
+                            };
+                        let validator: Arc<dyn Validator> = 'b: {
+                            let schema_file = match config.find_schema_path(&path) {
+                                Some(path) => path,
+                                None => {
+                                    break 'b Arc::new(AnyValidator);
+                                }
+                            };
+                            let schema_source = std::fs::read_to_string(&schema_file).unwrap();
+                            match deval_schema::compile(&schema_source) {
+                                Ok(v) => Arc::<dyn Validator>::from(v),
+                                Err(_) => Arc::new(AnyValidator),
+                            }
+                        };
+                        Some((format, validator))
+                    })
+                    .await;
                 });
         }
     }
