@@ -4,9 +4,13 @@ use deval_data_model::{Annotated, AnnotatedData, Format};
 use deval_validator::Validator;
 use line_index::LineIndex;
 
+pub mod token_store;
+pub use token_store::TokenStore;
+
 pub struct Document {
     pub annotated: Option<Annotated<AnnotatedData>>,
     pub line_index: LineIndex,
+    pub token_store: TokenStore,
     format: Arc<dyn Format>,
     schema: Arc<dyn Validator>,
 }
@@ -16,6 +20,7 @@ impl Document {
         let mut this = Self {
             line_index: LineIndex::new(""),
             annotated: None,
+            token_store: TokenStore::new(),
             format,
             schema,
         };
@@ -33,6 +38,9 @@ impl Document {
             }
         };
         let annotated = self.schema.validate(parsed).result;
-        self.annotated = Some(annotated);
+        self.annotated = Some(annotated.clone());
+        
+        // Update the token store with the new annotated data
+        self.token_store.build_from_annotated(&annotated);
     }
 }
