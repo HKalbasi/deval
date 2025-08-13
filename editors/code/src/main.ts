@@ -21,6 +21,22 @@ export function activate(context: vscode.ExtensionContext) {
     );
 
     client.start();
+
+    // Register the restart command
+    const restartCommand = vscode.commands.registerCommand('deval.restartServer', async () => {
+        vscode.window.showInformationMessage('Restarting Deval language server...');
+        
+        if (client) {
+            await client.stop();
+            await client.start();
+            
+            vscode.window.showInformationMessage('Deval language server restarted successfully');
+        } else {
+            vscode.window.showErrorMessage('Deval language server is not running');
+        }
+    });
+
+    context.subscriptions.push(restartCommand);
 }
 
 export function deactivate(): Thenable<void> | undefined {
