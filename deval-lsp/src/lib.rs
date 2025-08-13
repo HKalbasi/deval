@@ -132,43 +132,15 @@ impl<F: Fn(&Path) -> Option<(Arc<dyn Format>, Arc<dyn Validator>)> + Send + Sync
                 .await;
             return Ok(None);
         };
-        let Some(data) = doc.annotated.as_ref() else {
-            self.client
-                .log_message(MessageType::ERROR, "parse was failing!")
-                .await;
-            return Ok(None);
-        };
-        let mut result = vec![];
-        let mut prev_line = 0;
-        let mut prev_col = 0;
 
-        data.value.walk(&mut |annotation| {
-            let span = annotation.span.primary();
-            let token_type = match annotation.semantic_type {
-                Some(SemanticType::Number) => 19,
-                Some(SemanticType::String) => 18,
-                Some(SemanticType::Variable) => 8,
-                None => return,
-            };
-            let l = doc
-                .line_index
-                .line_col(TextSize::try_from(span.start).unwrap());
-            if l.line != prev_line {
-                prev_col = 0;
-            }
-            result.push(SemanticToken {
-                delta_line: l.line - prev_line,
-                delta_start: l.col - prev_col,
-                length: (span.end - span.start) as u32,
-                token_type,
-                token_modifiers_bitset: 0,
-            });
-            prev_col = l.col;
-            prev_line = l.line;
-        });
+        // Use the token store which already has all spans collected
+        let tokens: Vec<&document::token_store::SemanticToken> =
+            doc.token_store.all_tokens().iter().collect();
+        let lsp_tokens = convert_tokens_to_lsp(&doc, &tokens, 0);
+
         Ok(Some(SemanticTokensResult::Tokens(SemanticTokens {
             result_id: None,
-            data: result,
+            data: lsp_tokens,
         })))
     }
 
@@ -205,44 +177,11 @@ impl<F: Fn(&Path) -> Option<(Arc<dyn Format>, Arc<dyn Validator>)> + Send + Sync
 
         // Get tokens in range from our token store
         let tokens = doc.token_store.tokens_in_range(start_offset, end_offset);
-
-        let mut result = vec![];
-        let mut prev_line = params.range.start.line;
-        let mut prev_col = 0;
-
-        for token in tokens {
-            let l = doc
-                .line_index
-                .line_col(TextSize::try_from(token.start).unwrap());
-
-            // Convert our internal semantic type to LSP token type
-            let token_type = match token.token_type {
-                SemanticType::Number => 19,
-                SemanticType::String => 18,
-                SemanticType::Variable => 8,
-            };
-
-            if l.line != prev_line {
-                prev_col = 0;
-            }
-
-            // Only include tokens that are within the requested range
-            if l.line >= params.range.start.line && l.line <= params.range.end.line {
-                result.push(SemanticToken {
-                    delta_line: l.line - prev_line,
-                    delta_start: l.col - prev_col,
-                    length: (token.end - token.start) as u32,
-                    token_type,
-                    token_modifiers_bitset: 0,
-                });
-                prev_col = l.col;
-                prev_line = l.line;
-            }
-        }
+        let lsp_tokens = convert_tokens_to_lsp(&doc, &tokens, params.range.start.line);
 
         Ok(Some(SemanticTokensRangeResult::Tokens(SemanticTokens {
             result_id: None,
-            data: result,
+            data: lsp_tokens,
         })))
     }
 
@@ -289,6 +228,46 @@ impl<F: Fn(&Path) -> Option<(Arc<dyn Format>, Arc<dyn Validator>)> + Send + Sync
     async fn shutdown(&self) -> Result<()> {
         Ok(())
     }
+}
+
+/// Convert semantic tokens to LSP semantic tokens
+fn convert_tokens_to_lsp(
+    doc: &Document,
+    tokens: &[&document::token_store::SemanticToken],
+    start_line: u32,
+) -> Vec<SemanticToken> {
+    let mut result = vec![];
+    let mut prev_line = start_line;
+    let mut prev_col = 0;
+
+    for token in tokens {
+        let l = doc
+            .line_index
+            .line_col(TextSize::try_from(token.start).unwrap());
+
+        // Convert our internal semantic type to LSP token type
+        let token_type = match token.token_type {
+            SemanticType::Number => 19,
+            SemanticType::String => 18,
+            SemanticType::Variable => 8,
+        };
+
+        if l.line != prev_line {
+            prev_col = 0;
+        }
+
+        result.push(SemanticToken {
+            delta_line: l.line - prev_line,
+            delta_start: l.col - prev_col,
+            length: (token.end - token.start) as u32,
+            token_type,
+            token_modifiers_bitset: 0,
+        });
+        prev_col = l.col;
+        prev_line = l.line;
+    }
+
+    result
 }
 
 pub async fn start_server(

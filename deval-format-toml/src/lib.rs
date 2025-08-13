@@ -65,6 +65,7 @@ impl Format for Toml {
                         &mut root_data,
                         &key_parts,
                         &node,
+                        source,
                         filename,
                         &mut errors,
                     ) {
@@ -112,6 +113,7 @@ impl Format for Toml {
                         &mut root_data,
                         &key_parts,
                         &node,
+                        source,
                         filename,
                         &mut errors,
                     ) {
@@ -168,9 +170,13 @@ fn get_or_insert_table<'a>(
     mut current_data: &'a mut SpannedData,
     path: &[&str],
     table_header_node: &Node,
+    source: &str,
     filename: &str,
     errors: &mut Vec<ParseError>,
 ) -> Option<&'a mut Vec<(Spanned<String>, Spanned<SpannedData>)>> {
+    // Extract individual key spans from the table header
+    let key_spans = extract_individual_key_spans(table_header_node, source, filename, path);
+
     for (i, &key) in path.iter().enumerate() {
         let current_table_pairs = match current_data {
             SpannedData::Object(pairs) => pairs,
@@ -189,14 +195,13 @@ fn get_or_insert_table<'a>(
             let (found_key, found_value) = &mut current_table_pairs[index];
             // Don't add a span if it's for an implicitly created table.
             if !table_header_node.is_extra() {
-                found_key
-                    .annotation
-                    .0
-                    .push(make_span(table_header_node, filename));
-                found_value
-                    .annotation
-                    .0
-                    .push(make_span(table_header_node, filename));
+                // Use the specific key span instead of the whole table header
+                let key_span = key_spans
+                    .get(i)
+                    .cloned()
+                    .unwrap_or(make_span(table_header_node, filename));
+                found_key.annotation.0.push(key_span.clone());
+                found_value.annotation.0.push(key_span);
             }
             current_data = &mut found_value.value;
         } else {
@@ -207,7 +212,13 @@ fn get_or_insert_table<'a>(
             };
             let new_spanned_key = Spanned {
                 value: key.to_string(),
-                annotation: make_span_vec(table_header_node, filename),
+                // Use the specific key span instead of the whole table header
+                annotation: SpanSet(vec![
+                    key_spans
+                        .get(i)
+                        .cloned()
+                        .unwrap_or(make_span(table_header_node, filename)),
+                ]),
             };
 
             current_table_pairs.push((new_spanned_key, new_spanned_table));
@@ -232,6 +243,7 @@ fn append_to_array_of_tables<'a>(
     current_data: &'a mut SpannedData,
     path: &[&str],
     array_header_node: &Node,
+    source: &str,
     filename: &str,
     errors: &mut Vec<ParseError>,
 ) -> Option<&'a mut Vec<(Spanned<String>, Spanned<SpannedData>)>> {
@@ -241,6 +253,7 @@ fn append_to_array_of_tables<'a>(
         current_data,
         table_path,
         array_header_node,
+        source,
         filename,
         errors,
     )?;
@@ -250,13 +263,14 @@ fn append_to_array_of_tables<'a>(
     let array = match found_index {
         Some(index) => {
             let (key, spanned_value) = &mut parent_table[index];
-            key.annotation
-                .0
-                .push(make_span(array_header_node, filename));
-            spanned_value
-                .annotation
-                .0
-                .push(make_span(array_header_node, filename));
+            // Use the specific key span instead of the whole table header
+            let key_spans = extract_individual_key_spans(array_header_node, source, filename, path);
+            let key_span = key_spans
+                .get(table_path.len())
+                .cloned()
+                .unwrap_or(make_span(array_header_node, filename));
+            key.annotation.0.push(key_span.clone());
+            spanned_value.annotation.0.push(key_span);
             if let SpannedData::Array(arr) = &mut spanned_value.value {
                 arr
             } else {
@@ -268,10 +282,16 @@ fn append_to_array_of_tables<'a>(
             }
         }
         None => {
+            // Use the specific key span instead of the whole table header
+            let key_spans = extract_individual_key_spans(array_header_node, source, filename, path);
+            let key_span = key_spans
+                .get(table_path.len())
+                .cloned()
+                .unwrap_or(make_span(array_header_node, filename));
             parent_table.push((
                 Spanned {
                     value: array_key.to_string(),
-                    annotation: make_span_vec(array_header_node, filename),
+                    annotation: SpanSet(vec![key_span]),
                 },
                 Spanned {
                     value: SpannedData::Array(Vec::new()),
@@ -444,6 +464,68 @@ fn unquote_toml_string(text: &str) -> String {
         return text[1..text.len() - 1].to_string();
     }
     text.to_string()
+}
+
+/// Extract individual key spans from a table header node
+fn extract_individual_key_spans(
+    table_header_node: &Node,
+    source: &str,
+    filename: &str,
+    path: &[&str],
+) -> Vec<Span> {
+    // For a table header like [a.b.c], the second child (index 1) contains the key "a.b.c"
+    let key_node = match table_header_node.child(1) {
+        Some(node) => node,
+        None => {
+            return path
+                .iter()
+                .map(|_| make_span(table_header_node, filename))
+                .collect();
+        } // fallback
+    };
+
+    let key_text = match key_node.utf8_text(source.as_bytes()) {
+        Ok(text) => text,
+        Err(_) => {
+            return path
+                .iter()
+                .map(|_| make_span(table_header_node, filename))
+                .collect();
+        } // fallback
+    };
+
+    // Find the start position of the key node in the source
+    let key_start = key_node.start_byte();
+
+    // Split the key text and find positions of each part
+    let mut spans = Vec::new();
+    let mut current_pos = 0;
+
+    for &key_part in path {
+        // Find the key part in the key text starting from current position
+        if let Some(pos) = key_text[current_pos..].find(key_part) {
+            let absolute_pos = current_pos + pos;
+            let start = key_start + absolute_pos;
+            let end = start + key_part.len();
+
+            spans.push(Span {
+                filename: filename.to_string(),
+                start,
+                end,
+            });
+
+            // Move position past this key part and the dot (if any)
+            current_pos = absolute_pos + key_part.len();
+            if current_pos < key_text.len() && key_text[current_pos..].starts_with('.') {
+                current_pos += 1; // skip the dot
+            }
+        } else {
+            // Fallback if we can't find the key part
+            spans.push(make_span(table_header_node, filename));
+        }
+    }
+
+    spans
 }
 
 #[cfg(test)]
@@ -759,5 +841,180 @@ age = 30"#; // Unclosed string
 
         // This should fail
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_nested_table_key_spans() {
+        let toml = r#"[a.b]
+key = "value""#;
+        let result = Toml.parse(toml, "test.toml");
+
+        assert!(result.is_ok());
+        let parsed = result.expect("Failed to parse TOML");
+
+        match parsed.value {
+            SpannedData::Object(pairs) => {
+                assert_eq!(pairs.len(), 1);
+                assert_eq!(pairs[0].0.value, "a");
+
+                // Check that the span for 'a' covers just the 'a' character
+                let span_a = &pairs[0].0.annotation.0[0];
+                assert_eq!(span_a.start, 1); // '[' is at position 0, 'a' starts at position 1
+                assert_eq!(span_a.end, 2); // 'a' ends at position 2
+
+                match &pairs[0].1.value {
+                    SpannedData::Object(inner_pairs) => {
+                        assert_eq!(inner_pairs.len(), 1);
+                        assert_eq!(inner_pairs[0].0.value, "b");
+
+                        // Check that the span for 'b' covers just the 'b' character
+                        let span_b = &inner_pairs[0].0.annotation.0[0];
+                        assert_eq!(span_b.start, 3); // 'a' is at 1-2, '.' at 2, 'b' starts at position 3
+                        assert_eq!(span_b.end, 4); // 'b' ends at position 4
+
+                        match &inner_pairs[0].1.value {
+                            SpannedData::Object(leaf_pairs) => {
+                                assert_eq!(leaf_pairs.len(), 1);
+                                assert_eq!(leaf_pairs[0].0.value, "key");
+
+                                // The key "key" should have its own span in the key-value pair
+                                // This is not part of our fix, so we just check it exists
+                                match &leaf_pairs[0].1.value {
+                                    SpannedData::String(s) => assert_eq!(s.value, "value"),
+                                    _ => panic!("Expected string value"),
+                                }
+                            }
+                            _ => panic!("Expected object for 'b' value"),
+                        }
+                    }
+                    _ => panic!("Expected object for 'a' value"),
+                }
+            }
+            _ => panic!("Expected object"),
+        }
+    }
+
+    #[test]
+    fn test_span_accumulation() {
+        // Test that when the same key appears in multiple table headers,
+        // the spans are accumulated in the SpanSet
+        let toml = r#"[key]
+x = 1
+
+[key.a]
+y = 2"#;
+
+        let result = Toml.parse(toml, "test.toml");
+        assert!(result.is_ok());
+        let parsed = result.expect("Failed to parse TOML");
+
+        match parsed.value {
+            SpannedData::Object(pairs) => {
+                assert_eq!(pairs.len(), 1);
+                assert_eq!(pairs[0].0.value, "key");
+
+                // The key "key" should have spans from both [key] and [key.a]
+                assert_eq!(pairs[0].0.annotation.0.len(), 2); // Should have 2 spans
+
+                // First span should be from [key] table
+                let span1 = &pairs[0].0.annotation.0[0];
+                assert_eq!(span1.start, 1); // 'k' in [key]
+                assert_eq!(span1.end, 4); // end of 'key' in [key]
+
+                // Second span should be from [key.a] table
+                let span2 = &pairs[0].0.annotation.0[1];
+                assert_eq!(span2.start, 14); // 'k' in [key.a] 
+                assert_eq!(span2.end, 17); // end of 'key' in [key.a]
+            }
+            _ => panic!("Expected object"),
+        }
+    }
+
+    #[test]
+    fn test_array_table_key_spans() {
+        let toml = r#"[[products]]
+name = "Hammer""#;
+        let result = Toml.parse(toml, "test.toml");
+
+        assert!(result.is_ok());
+        let parsed = result.expect("Failed to parse TOML");
+
+        match parsed.value {
+            SpannedData::Object(pairs) => {
+                assert_eq!(pairs.len(), 1);
+                assert_eq!(pairs[0].0.value, "products");
+
+                // Check that the span for 'products' covers just the 'products' part
+                let span_products = &pairs[0].0.annotation.0[0];
+                assert_eq!(span_products.start, 2); // '[[' is at positions 0-1, 'p' starts at position 2
+                assert_eq!(span_products.end, 10); // 'products' ends at position 10
+
+                match &pairs[0].1.value {
+                    SpannedData::Array(arr) => {
+                        assert_eq!(arr.len(), 1);
+                        match &arr[0].value {
+                            SpannedData::Object(inner_pairs) => {
+                                assert_eq!(inner_pairs.len(), 1);
+                                assert_eq!(inner_pairs[0].0.value, "name");
+                                // The key "name" should have its own span in the key-value pair
+                            }
+                            _ => panic!("Expected object for array element"),
+                        }
+                    }
+                    _ => panic!("Expected array for 'products' value"),
+                }
+            }
+            _ => panic!("Expected object"),
+        }
+    }
+
+    #[test]
+    fn test_nested_array_table_key_spans() {
+        let toml = r#"[[a.b]]
+key = "value""#;
+        let result = Toml.parse(toml, "test.toml");
+
+        assert!(result.is_ok());
+        let parsed = result.expect("Failed to parse TOML");
+
+        match parsed.value {
+            SpannedData::Object(pairs) => {
+                assert_eq!(pairs.len(), 1);
+                assert_eq!(pairs[0].0.value, "a");
+
+                // Check that the span for 'a' covers just the 'a' character
+                let span_a = &pairs[0].0.annotation.0[0];
+                assert_eq!(span_a.start, 2); // '[[' is at positions 0-1, 'a' starts at position 2
+                assert_eq!(span_a.end, 3); // 'a' ends at position 3
+
+                match &pairs[0].1.value {
+                    SpannedData::Object(inner_pairs) => {
+                        assert_eq!(inner_pairs.len(), 1);
+                        assert_eq!(inner_pairs[0].0.value, "b");
+
+                        // Check that the span for 'b' covers just the 'b' character
+                        let span_b = &inner_pairs[0].0.annotation.0[0];
+                        assert_eq!(span_b.start, 4); // 'a' is at 2-3, '.' at 3, 'b' starts at position 4
+                        assert_eq!(span_b.end, 5); // 'b' ends at position 5
+
+                        match &inner_pairs[0].1.value {
+                            SpannedData::Array(arr) => {
+                                assert_eq!(arr.len(), 1);
+                                match &arr[0].value {
+                                    SpannedData::Object(leaf_pairs) => {
+                                        assert_eq!(leaf_pairs.len(), 1);
+                                        assert_eq!(leaf_pairs[0].0.value, "key");
+                                    }
+                                    _ => panic!("Expected object for table content"),
+                                }
+                            }
+                            _ => panic!("Expected array for 'b' value"),
+                        }
+                    }
+                    _ => panic!("Expected object for 'a' value"),
+                }
+            }
+            _ => panic!("Expected object"),
+        }
     }
 }

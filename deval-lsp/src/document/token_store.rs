@@ -65,6 +65,11 @@ impl TokenStore {
         Self { tokens: Vec::new() }
     }
 
+    /// Get all tokens
+    pub fn all_tokens(&self) -> &[SemanticToken] {
+        &self.tokens
+    }
+
     /// Build the token store from annotated data
     pub fn build_from_annotated(&mut self, annotated: &Annotated<AnnotatedData, FullAnnotation>) {
         self.tokens.clear();
