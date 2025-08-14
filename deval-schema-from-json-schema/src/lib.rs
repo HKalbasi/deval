@@ -25,7 +25,8 @@ enum JsonSchemaType {
 }
 
 pub fn convert(json_schema_text: &str) -> String {
-    let json_schema: JsonSchema = serde_json::from_str(json_schema_text).expect("Invalid JSON Schema");
+    let json_schema: JsonSchema =
+        serde_json::from_str(json_schema_text).expect("Invalid JSON Schema");
     json_schema_to_deval(&json_schema)
 }
 
@@ -46,26 +47,26 @@ fn json_schema_to_deval(schema: &JsonSchema) -> String {
                 }
                 "object" => {
                     let mut fields = Vec::new();
-                    
+
                     // Get required fields
                     let required: HashSet<&String> = schema.required.iter().collect();
-                    
+
                     for (key, prop_schema) in &schema.properties {
                         // Only include required fields since deval schema doesn't support optional fields
                         if required.contains(key) {
                             let field_type = json_schema_to_deval(prop_schema);
-                            
+
                             // Add documentation if available
                             let doc_comment = if let Some(desc) = &prop_schema.description {
                                 format!("/// {}\n    ", desc)
                             } else {
                                 String::new()
                             };
-                            
+
                             fields.push(format!("{}{}: {}", doc_comment, key, field_type));
                         }
                     }
-                    
+
                     format!("{{\n    {}\n}}", fields.join(",\n    "))
                 }
                 _ => "any".to_string(),
@@ -92,26 +93,26 @@ fn json_schema_to_deval(schema: &JsonSchema) -> String {
     } else if !schema.properties.is_empty() {
         // Object without explicit type
         let mut fields = Vec::new();
-        
+
         // Get required fields
         let required: HashSet<&String> = schema.required.iter().collect();
-        
+
         for (key, prop_schema) in &schema.properties {
             // Only include required fields since deval schema doesn't support optional fields
             if required.contains(key) {
                 let field_type = json_schema_to_deval(prop_schema);
-                
+
                 // Add documentation if available
                 let doc_comment = if let Some(desc) = &prop_schema.description {
                     format!("/// {}\n    ", desc)
                 } else {
                     String::new()
                 };
-                
+
                 fields.push(format!("{}{}: {}", doc_comment, key, field_type));
             }
         }
-        
+
         format!("{{\n    {}\n}}", fields.join(",\n    "))
     } else if schema.additional_properties.is_some() {
         // For objects with additional properties, use a generic object for now
