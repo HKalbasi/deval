@@ -129,10 +129,11 @@ impl Validator for ArrayValidator {
 
 #[derive(Debug, Clone)]
 pub enum RecordValidator {
-    MandatoryKey {
+    SimpleKey {
         key: String,
         docs: String,
         value: Box<dyn Validator>,
+        optional: bool,
     },
     AnyKey,
 }
@@ -140,21 +141,21 @@ pub enum RecordValidator {
 impl RecordValidator {
     fn matches(&self, input_key: &str) -> bool {
         match self {
-            RecordValidator::MandatoryKey { key, .. } => key == input_key,
+            RecordValidator::SimpleKey { key, .. } => key == input_key,
             RecordValidator::AnyKey => true,
         }
     }
 
     fn validator(&self) -> &dyn Validator {
         match self {
-            RecordValidator::MandatoryKey { value, .. } => &**value,
+            RecordValidator::SimpleKey { value, .. } => &**value,
             RecordValidator::AnyKey => &AnyValidator,
         }
     }
 
     fn docs(&self) -> String {
         match self {
-            RecordValidator::MandatoryKey { docs, .. } => docs.clone(),
+            RecordValidator::SimpleKey { docs, .. } => docs.clone(),
             RecordValidator::AnyKey => "".to_owned(),
         }
     }
@@ -169,8 +170,12 @@ pub struct OrValidator(pub Vec<Box<dyn Validator>>);
 impl ObjectValidator {
     fn mandatory_keys(&self) -> impl Iterator<Item = &str> {
         self.0.iter().filter_map(|x| match x {
-            RecordValidator::MandatoryKey { key, .. } => Some(&**key),
-            RecordValidator::AnyKey => None,
+            RecordValidator::SimpleKey {
+                key,
+                optional: false,
+                ..
+            } => Some(&**key),
+            _ => None,
         })
     }
 

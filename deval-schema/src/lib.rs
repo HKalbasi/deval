@@ -32,13 +32,17 @@ fn compile_ast(
                 .into_iter()
                 .map(|r| {
                     Ok(match r {
-                        deval_schema_ast::RecordMatcher::SimpleKey { key, docs, value } => {
-                            RecordValidator::MandatoryKey {
-                                key,
-                                docs,
-                                value: compile_ast(value, env)?,
-                            }
-                        }
+                        deval_schema_ast::RecordMatcher::SimpleKey {
+                            key,
+                            docs,
+                            value,
+                            optional,
+                        } => RecordValidator::SimpleKey {
+                            key,
+                            docs,
+                            value: compile_ast(value, env)?,
+                            optional,
+                        },
                         deval_schema_ast::RecordMatcher::AnyKey => RecordValidator::AnyKey,
                     })
                 })

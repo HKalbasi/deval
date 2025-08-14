@@ -10,6 +10,7 @@ pub struct Spanned<T> {
 pub enum RecordMatcher {
     SimpleKey {
         key: String,
+        optional: bool,
         docs: String,
         value: DataMatcher,
     },

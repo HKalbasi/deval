@@ -28,10 +28,17 @@ fn parser<'a>() -> impl Parser<'a, &'a str, DataMatcher, extra::Err<Error<'a>>> 
             .repeated()
             .collect::<Vec<_>>()
             .map(|docs| docs.join("\n"))
-            .then(text::ident().map(String::from))
+            .then(text::ident().map(String::from).then(just("?").or_not()))
             .then_ignore(just(':').padded())
             .then(data.clone())
-            .map(|((docs, key), value)| RecordMatcher::SimpleKey { key, docs, value });
+            .map(
+                |((docs, (key, is_optional)), value)| RecordMatcher::SimpleKey {
+                    key,
+                    optional: is_optional.is_some(),
+                    docs,
+                    value,
+                },
+            );
 
         let any_key_record = just("..").padded().map(|_| RecordMatcher::AnyKey);
         let record = simple_key_record.or(any_key_record);
