@@ -293,6 +293,7 @@ version = "0.1.0"
 name = "deval-schema-from-json-schema"
 version = "0.1.0"
 dependencies = [
+ "deval-schema",
  "serde",
  "serde_json",
 ]
