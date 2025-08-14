@@ -18,6 +18,9 @@ enum Commands {
         /// Specific test files to analyze (default: all)
         #[clap(short, long, value_delimiter = ',')]
         files: Option<Vec<String>>,
+        /// Specific test cases to analyze (default: all)
+        #[clap(short, long, value_delimiter = ',')]
+        cases: Option<Vec<usize>>,
         /// Show detailed output for each test
         #[clap(short, long)]
         verbose: bool,
@@ -71,8 +74,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let deval_cli_path = "../target/debug/deval-cli";
 
     match cli.command {
-        Commands::Analyze { files, verbose } => {
-            run_analysis(deval_cli_path, files, verbose)?;
+        Commands::Analyze {
+            files,
+            cases,
+            verbose,
+        } => {
+            run_analysis(deval_cli_path, files, cases, verbose)?;
         }
         Commands::Debug { file, case, test } => {
             run_debug(deval_cli_path, &file, case, test)?;
@@ -85,6 +92,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 fn run_analysis(
     deval_cli_path: &str,
     files: Option<Vec<String>>,
+    cases: Option<Vec<usize>>,
     verbose: bool,
 ) -> Result<(), Box<dyn std::error::Error>> {
     println!("Running comprehensive test suite analysis");
@@ -103,10 +111,28 @@ fn run_analysis(
         ]
     };
 
+    let mut total_passed = 0;
+    let mut total_failed = 0;
+
     for test_file in test_files {
         println!("\n=== Testing {} ===", test_file);
-        test_file_coverage(deval_cli_path, temp_dir, &test_file, verbose)?;
+        test_file_coverage(
+            deval_cli_path,
+            temp_dir,
+            &test_file,
+            &cases,
+            verbose,
+            &mut total_passed,
+            &mut total_failed,
+        )?;
     }
+
+    println!(
+        "\n\nTotal Pass rate = {:.2}% ({}/{})",
+        (total_passed as f64 / (total_passed + total_failed) as f64) * 100.0,
+        total_passed,
+        total_passed + total_failed,
+    );
 
     // Clean up temp directory
     let _ = fs::remove_dir_all(temp_dir);
@@ -118,7 +144,10 @@ fn test_file_coverage(
     deval_cli_path: &str,
     temp_dir: &str,
     filename: &str,
+    cases_filter: &Option<Vec<usize>>,
     verbose: bool,
+    total_passed: &mut i32,
+    total_failed: &mut i32,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let current_dir = env::current_dir()?;
     let filepath = format!(
@@ -133,6 +162,12 @@ fn test_file_coverage(
     let mut passed_tests = 0;
 
     for (i, test_case) in test_cases.iter().enumerate() {
+        if let Some(cases) = cases_filter {
+            if !cases.contains(&i) {
+                continue;
+            }
+        }
+
         // Convert the schema to deval format
         let schema_json = serde_json::to_string(&test_case.schema)?;
         let schema_path = format!("{}/temp_schema.json", temp_dir);
@@ -190,6 +225,9 @@ fn test_file_coverage(
         "  Coverage: {:.2}% ({}/{})",
         coverage, passed_tests, total_tests
     );
+
+    *total_passed += passed_tests;
+    *total_failed += total_tests as i32 - passed_tests;
 
     Ok(())
 }

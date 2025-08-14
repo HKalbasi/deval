@@ -196,7 +196,10 @@ fn main() -> ExitCode {
                         }
                     };
                     let r = validator.validate(data);
-                    report_validation_errors(&source, &r.errors);
+                    if !r.errors.is_empty() {
+                        report_validation_errors(&source, &r.errors);
+                        return ExitCode::FAILURE;
+                    }
                 }
                 Err(errors) => {
                     report_errors(&source, &errors);
