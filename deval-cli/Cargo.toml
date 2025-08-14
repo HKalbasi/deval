@@ -11,6 +11,7 @@ deval-format-json = { version = "0.1.0", path = "../deval-format-json" }
 deval-format-toml = { version = "0.1.0", path = "../deval-format-toml" }
 deval-lsp = { version = "0.1.0", path = "../deval-lsp" }
 deval-schema = { version = "0.1.0", path = "../deval-schema" }
+deval-schema-from-json-schema = { version = "0.1.0", path = "../deval-schema-from-json-schema" }
 deval-serde = { version = "0.1.0", path = "../deval-serde" }
 deval-validator = { version = "0.1.0", path = "../deval-validator" }
 serde = { version = "1.0.219", features = ["derive"] }

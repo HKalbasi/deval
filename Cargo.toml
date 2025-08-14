@@ -1,3 +1,3 @@
 [workspace]
 resolver = "3"
-members = ["deval-cli", "deval-data-model", "deval-format-json", "deval-format-toml", "deval-lsp", "deval-schema", "deval-schema-ast", "deval-schema-parser", "deval-serde", "deval-validator"]
+members = ["deval-cli", "deval-data-model", "deval-format-json", "deval-format-toml", "deval-lsp", "deval-schema", "deval-schema-ast", "deval-schema-from-json-schema", "deval-schema-parser", "deval-serde", "deval-validator"]

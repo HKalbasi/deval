@@ -234,6 +234,7 @@ dependencies = [
  "deval-format-toml",
  "deval-lsp",
  "deval-schema",
+ "deval-schema-from-json-schema",
  "deval-serde",
  "deval-validator",
  "serde",
@@ -287,6 +288,14 @@ dependencies = [
 [[package]]
 name = "deval-schema-ast"
 version = "0.1.0"
+
+[[package]]
+name = "deval-schema-from-json-schema"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+]
 
 [[package]]
 name = "deval-schema-parser"

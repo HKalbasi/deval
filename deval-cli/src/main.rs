@@ -121,6 +121,9 @@ fn display_errors(src: &str, errors: Vec<deval_schema::Error<'_>>) {
 
 #[derive(clap::Parser)]
 enum Args {
+    ConvertJsonSchema {
+        file: PathBuf,
+    },
     Check {
         #[arg(short, long)]
         schema: Option<PathBuf>,
@@ -147,6 +150,11 @@ fn main() {
     let args = Args::parse();
 
     match args {
+        Args::ConvertJsonSchema { file } => {
+            let text = std::fs::read_to_string(&file).unwrap();
+            let result = deval_schema_from_json_schema::convert(&text);
+            println!("{result}");
+        }
         Args::Check { schema, file } => {
             let schema = match schema {
                 Some(path) => path,
