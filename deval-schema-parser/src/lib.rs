@@ -24,14 +24,17 @@ fn parser<'a>() -> impl Parser<'a, &'a str, DataMatcher, extra::Err<Error<'a>>> 
             .padded();
 
         // Parse a record field: docs + key + colon + data type
-        let record = doc_comment
+        let simple_key_record = doc_comment
             .repeated()
             .collect::<Vec<_>>()
             .map(|docs| docs.join("\n"))
             .then(text::ident().map(String::from))
             .then_ignore(just(':').padded())
             .then(data.clone())
-            .map(|((docs, key), value)| RecordMatcher { key, docs, value });
+            .map(|((docs, key), value)| RecordMatcher::SimpleKey { key, docs, value });
+
+        let any_key_record = just("..").padded().map(|_| RecordMatcher::AnyKey);
+        let record = simple_key_record.or(any_key_record);
 
         // Parse objects: { ... }
         let object = just('{')

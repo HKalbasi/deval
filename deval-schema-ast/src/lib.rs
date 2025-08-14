@@ -7,10 +7,13 @@ pub struct Spanned<T> {
 }
 
 #[derive(Debug)]
-pub struct RecordMatcher {
-    pub key: String,
-    pub docs: String,
-    pub value: DataMatcher,
+pub enum RecordMatcher {
+    SimpleKey {
+        key: String,
+        docs: String,
+        value: DataMatcher,
+    },
+    AnyKey,
 }
 
 #[derive(Debug)]

@@ -35,6 +35,7 @@ fn convert_json_type(type_str: &str) -> String {
         "string" | "number" | "integer" | "null" => type_str.to_string(),
         "boolean" => "bool".to_string(),
         "array" => "any[]".to_string(),
+        "object" => "{ .. }".to_string(),
         _ => "any".to_string(),
     }
 }

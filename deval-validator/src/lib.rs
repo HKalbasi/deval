@@ -128,21 +128,54 @@ impl Validator for ArrayValidator {
 }
 
 #[derive(Debug, Clone)]
-pub struct ObjectValidator(pub Vec<(String, String, Box<dyn Validator>)>);
+pub enum RecordValidator {
+    MandatoryKey {
+        key: String,
+        docs: String,
+        value: Box<dyn Validator>,
+    },
+    AnyKey,
+}
+
+impl RecordValidator {
+    fn matches(&self, input_key: &str) -> bool {
+        match self {
+            RecordValidator::MandatoryKey { key, .. } => key == input_key,
+            RecordValidator::AnyKey => true,
+        }
+    }
+
+    fn validator(&self) -> &dyn Validator {
+        match self {
+            RecordValidator::MandatoryKey { value, .. } => &**value,
+            RecordValidator::AnyKey => &AnyValidator,
+        }
+    }
+
+    fn docs(&self) -> String {
+        match self {
+            RecordValidator::MandatoryKey { docs, .. } => docs.clone(),
+            RecordValidator::AnyKey => "".to_owned(),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct ObjectValidator(pub Vec<RecordValidator>);
 
 #[derive(Debug, Clone)]
 pub struct OrValidator(pub Vec<Box<dyn Validator>>);
 
 impl ObjectValidator {
     fn mandatory_keys(&self) -> impl Iterator<Item = &str> {
-        self.0.iter().map(|x| &*x.0)
+        self.0.iter().filter_map(|x| match x {
+            RecordValidator::MandatoryKey { key, .. } => Some(&**key),
+            RecordValidator::AnyKey => None,
+        })
     }
 
-    fn find_validator(&self, key: &str) -> Option<(&String, &String, &Box<dyn Validator>)> {
-        self.0
-            .iter()
-            .find(|x| x.0 == key)
-            .map(|x| (&x.0, &x.1, &x.2))
+    fn find_validator(&self, key: &str) -> Option<&RecordValidator> {
+        self.0.iter().find(|x| x.matches(key))
     }
 }
 
@@ -170,7 +203,7 @@ impl Validator for ObjectValidator {
                 });
             }
 
-            let Some((_, key_docs, validator)) = self.find_validator(&key.value) else {
+            let Some(record_validator) = self.find_validator(&key.value) else {
                 errors.push(ValidationError {
                     span: key.annotation.primary(),
                     text: format!("Unexpected key {}", key.value),
@@ -178,14 +211,14 @@ impl Validator for ObjectValidator {
                 continue;
             };
 
-            let r = validator.validate(value);
+            let r = record_validator.validator().validate(value);
 
             // Apply documentation to the key
             let annotated_key = Annotated {
                 value: key.value,
                 annotation: FullAnnotation {
                     span: key.annotation,
-                    docs: key_docs.clone(),
+                    docs: record_validator.docs(),
                     semantic_type: Some(SemanticType::Variable),
                 },
             };
