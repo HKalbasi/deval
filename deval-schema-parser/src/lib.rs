@@ -47,7 +47,7 @@ fn parser<'a>() -> impl Parser<'a, &'a str, DataMatcher, extra::Err<Error<'a>>> 
             .map(DataMatcher::Object);
 
         // Parse basic identifiers (string, number, etc.)
-        let ident = spanned(text::ident().map(String::from)).map(DataMatcher::Ident);
+        let ident = spanned(text::ident().padded().map(String::from)).map(DataMatcher::Ident);
 
         // Parse arrays: type followed by []
         let array = ident

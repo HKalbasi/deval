@@ -1,6 +1,7 @@
 use std::{
     os::unix::ffi::OsStrExt,
     path::{Path, PathBuf},
+    process::ExitCode,
     sync::Arc,
 };
 
@@ -145,7 +146,7 @@ fn load_config() -> DevalConfig {
     deval_serde::deserialize_from_annotated(&annotated.result.discard_annotation())
 }
 
-fn main() {
+fn main() -> ExitCode {
     use clap::Parser;
     let args = Args::parse();
 
@@ -154,6 +155,7 @@ fn main() {
             let text = std::fs::read_to_string(&file).unwrap();
             let result = deval_schema_from_json_schema::convert(&text);
             println!("{result}");
+            ExitCode::SUCCESS
         }
         Args::Check { schema, file } => {
             let schema = match schema {
@@ -164,8 +166,8 @@ fn main() {
                     match config.find_schema_path(&file) {
                         Some(path) => path,
                         None => {
-                            println!("Unknown schema for {file:?}");
-                            return;
+                            eprintln!("Unknown schema for {file:?}");
+                            return ExitCode::FAILURE;
                         }
                     }
                 }
@@ -190,7 +192,7 @@ fn main() {
                         Ok(v) => v,
                         Err(e) => {
                             display_errors(&schema_source, e);
-                            return;
+                            return ExitCode::FAILURE;
                         }
                     };
                     let r = validator.validate(data);
@@ -198,9 +200,11 @@ fn main() {
                 }
                 Err(errors) => {
                     report_errors(&source, &errors);
+                    return ExitCode::FAILURE;
                 }
             }
             println!("Input matches the schema!");
+            ExitCode::SUCCESS
         }
         Args::Lsp => {
             let config = load_config();
@@ -235,6 +239,7 @@ fn main() {
                     })
                     .await;
                 });
+            ExitCode::SUCCESS
         }
     }
 }
