@@ -35,7 +35,7 @@ fn compile_ast(
 }
 
 fn default_env() -> HashMap<String, Box<dyn Validator>> {
-    let key_values: [(String, Box<dyn Validator>); 4] = [
+    let key_values: [(String, Box<dyn Validator>); _] = [
         (
             "string".to_owned(),
             Box::new(LambdaValidator(|d| {
@@ -51,6 +51,26 @@ fn default_env() -> HashMap<String, Box<dyn Validator>> {
             Box::new(LambdaValidator(|d| {
                 if !matches!(d.value, SpannedData::Number(_)) {
                     Some(format!("Expected Number, found {}", d.value.kind()))
+                } else {
+                    None
+                }
+            })),
+        ),
+        (
+            "integer".to_owned(),
+            Box::new(LambdaValidator(|d| {
+                if !matches!(&d.value, SpannedData::Number(n) if n.value.fract() == 0.) {
+                    Some(format!("Expected Integer, found {}", d.value.kind()))
+                } else {
+                    None
+                }
+            })),
+        ),
+        (
+            "null".to_owned(),
+            Box::new(LambdaValidator(|d| {
+                if !matches!(d.value, SpannedData::Null) {
+                    Some(format!("Expected Null, found {}", d.value.kind()))
                 } else {
                     None
                 }

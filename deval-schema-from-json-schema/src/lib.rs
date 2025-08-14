@@ -35,8 +35,7 @@ fn json_schema_to_deval(schema: &JsonSchema) -> String {
     if let Some(type_field) = &schema.type_field {
         match type_field {
             JsonSchemaType::Single(type_str) => match type_str.as_str() {
-                "string" => "string".to_string(),
-                "number" | "integer" => "number".to_string(),
+                "string" | "number" | "integer" | "null" => type_str.to_string(),
                 "boolean" => "bool".to_string(),
                 "array" => {
                     if let Some(items) = &schema.items {
