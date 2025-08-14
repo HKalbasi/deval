@@ -4,7 +4,7 @@ use deval_data_model::SpannedData;
 use deval_schema_ast::DataMatcher;
 pub use deval_schema_parser::Error;
 use deval_schema_parser::SimpleSpan;
-use deval_validator::{ArrayValidator, LambdaValidator, ObjectValidator, Validator};
+use deval_validator::{ArrayValidator, LambdaValidator, ObjectValidator, OrValidator, Validator};
 
 fn compile_ast(
     ast: DataMatcher,
@@ -29,6 +29,12 @@ fn compile_ast(
             record_matchers
                 .into_iter()
                 .map(|r| Ok((r.key, r.docs, compile_ast(r.value, env)?)))
+                .collect::<Result<_, _>>()?,
+        ))),
+        DataMatcher::Union(cases) => Ok(Box::new(OrValidator(
+            cases
+                .into_iter()
+                .map(|x| compile_ast(x, env))
                 .collect::<Result<_, _>>()?,
         ))),
     }

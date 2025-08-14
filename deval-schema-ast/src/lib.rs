@@ -18,4 +18,5 @@ pub enum DataMatcher {
     Ident(Spanned<String>),
     Array { element: Box<DataMatcher> },
     Object(Vec<RecordMatcher>),
+    Union(Vec<DataMatcher>),
 }

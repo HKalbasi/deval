@@ -50,7 +50,7 @@ fn parser<'a>() -> impl Parser<'a, &'a str, DataMatcher, extra::Err<Error<'a>>> 
         let ident = spanned(text::ident().padded().map(String::from)).map(DataMatcher::Ident);
 
         // Parse arrays: type followed by []
-        let array = ident
+        let arrayable = ident
             .or(object)
             .then(just("[]").padded().repeated().count())
             .map(|(base, brackets)| {
@@ -59,7 +59,20 @@ fn parser<'a>() -> impl Parser<'a, &'a str, DataMatcher, extra::Err<Error<'a>>> 
                 })
             });
 
-        array
+        // Parse unions: A | B | C
+        let union = arrayable
+            .separated_by(just('|').padded())
+            .at_least(1)
+            .collect::<Vec<_>>()
+            .map(|mut items: Vec<DataMatcher>| {
+                if items.len() == 1 {
+                    items.remove(0)
+                } else {
+                    DataMatcher::Union(items)
+                }
+            });
+
+        union
     })
     .then_ignore(end())
 }

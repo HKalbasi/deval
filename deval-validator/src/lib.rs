@@ -130,6 +130,9 @@ impl Validator for ArrayValidator {
 #[derive(Debug, Clone)]
 pub struct ObjectValidator(pub Vec<(String, String, Box<dyn Validator>)>);
 
+#[derive(Debug, Clone)]
+pub struct OrValidator(pub Vec<Box<dyn Validator>>);
+
 impl ObjectValidator {
     fn mandatory_keys(&self) -> impl Iterator<Item = &str> {
         self.0.iter().map(|x| &*x.0)
@@ -213,5 +216,15 @@ impl Validator for ObjectValidator {
             },
             errors,
         }
+    }
+}
+
+impl Validator for OrValidator {
+    fn validate(&self, data: Spanned<SpannedData>) -> ValidationResult {
+        self.0
+            .iter()
+            .map(|v| v.validate(data.clone()))
+            .min_by_key(|x| x.errors.len())
+            .unwrap()
     }
 }

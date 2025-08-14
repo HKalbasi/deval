@@ -6,5 +6,5 @@
         "street": "123 Main St",
         "city": "Anytown"
     },
-    "hobbies": ["reading", "swimming"]
+    "hobbies": "reading"
 }

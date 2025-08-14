@@ -7,5 +7,5 @@
         street: string,
         city: string,
     },
-    hobbies: string[],
+    hobbies: string[] | string,
 }
