@@ -91,7 +91,7 @@ impl Validator for NumberValidator {
 }
 
 #[derive(Debug, Clone)]
-pub struct ArrayValidator(pub Box<dyn Validator>);
+pub struct ArrayValidator(pub Box<dyn Validator>, pub Option<usize>, pub Option<usize>);
 
 impl Validator for ArrayValidator {
     fn validate(&self, data: Spanned<SpannedData>) -> ValidationResult {
@@ -105,7 +105,7 @@ impl Validator for ArrayValidator {
             };
         };
         let mut errors = vec![];
-        let items = items
+        let items: Vec<Annotated<AnnotatedData>> = items
             .into_iter()
             .map(|x| {
                 self.0
@@ -113,17 +113,26 @@ impl Validator for ArrayValidator {
                     .append_errors_and_return_result(&mut errors)
             })
             .collect();
-        ValidationResult {
-            result: Annotated {
-                value: AnnotatedData::Array(items),
-                annotation: FullAnnotation {
-                    span: data.annotation,
-                    docs: String::new(),
-                    semantic_type: None,
-                },
+        let result = Annotated {
+            value: AnnotatedData::Array(items.clone()),
+            annotation: FullAnnotation {
+                span: data.annotation,
+                docs: String::new(),
+                semantic_type: None,
             },
-            errors,
+        };
+        if let Some(max_items) = self.2 {
+            if let Some(excess_elem) = items.get(max_items) {
+                return ValidationResult {
+                    errors: vec![ValidationError {
+                        span: excess_elem.annotation.span.primary(),
+                        text: format!("Expected at most {max_items} number of elements"),
+                    }],
+                    result,
+                };
+            }
         }
+        ValidationResult { result, errors }
     }
 }
 

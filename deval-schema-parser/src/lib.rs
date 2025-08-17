@@ -58,15 +58,43 @@ fn parser<'a>() -> impl Parser<'a, &'a str, Expression, extra::Err<Error<'a>>> {
 
         // Parse basic identifiers (string, number, etc.)
         let ident = spanned(text::ident().padded().map(String::from)).map(Expression::Ident);
+        let number = spanned(
+            text::digits(10)
+                .collect::<String>()
+                .padded()
+                .map(|x| x.parse().unwrap()),
+        )
+        .map(Expression::Number);
+
+        let number_or_ident = number.or(ident);
+        let range = spanned(number_or_ident.clone().map(Box::new))
+            .or_not()
+            .then_ignore(just(".."))
+            .then(just("=").or_not())
+            .then(spanned(number_or_ident.clone().map(Box::new)).or_not())
+            .map(|x| Expression::Range {
+                start: x.0.0,
+                end: x.1,
+                is_inclusive: x.0.1.is_some(),
+            });
+
+        let array_index = just("[")
+            .padded()
+            .ignore_then(spanned(data.map(Box::new)).or_not())
+            .then_ignore(just("]").padded());
 
         // Parse arrays: type followed by []
-        let arrayable = ident
+        let arrayable = number_or_ident
+            .or(range)
             .or(object)
-            .then(just("[]").padded().repeated().count())
+            .then(array_index.padded().repeated().collect::<Vec<_>>())
             .map(|(base, brackets)| {
-                (0..brackets).fold(base, |inner, _| Expression::Array {
-                    element: Box::new(inner),
-                })
+                brackets
+                    .into_iter()
+                    .fold(base, |inner, index| Expression::Array {
+                        element: Box::new(inner),
+                        index,
+                    })
             });
 
         // Parse unions: A | B | C

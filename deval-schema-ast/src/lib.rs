@@ -26,7 +26,10 @@ pub enum Expression {
         is_inclusive: bool,
     },
     Ident(Spanned<String>),
-    Array { element: Box<Expression> },
+    Array {
+        element: Box<Expression>,
+        index: Option<Spanned<Box<Expression>>>,
+    },
     Object(Vec<RecordMatcher>),
     Union(Vec<Expression>),
 }

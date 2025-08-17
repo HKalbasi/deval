@@ -41,13 +41,47 @@ fn eval_as_validator(
     Ok(value.to_validator())
 }
 
-fn eval_as_number(ast: Expression, span: Range<usize>, env: &HashMap<String, Value>) -> Result<f64, Error<'static>> {
+fn eval_as_number(
+    ast: Expression,
+    span: Range<usize>,
+    env: &HashMap<String, Value>,
+) -> Result<f64, Error<'static>> {
     let value = compile_ast(ast, env)?;
     match value {
         Value::Number(n) => Ok(n),
         _ => Err(Error::custom(
-            SimpleSpan { start: span.start, end: span.end, context: () },
-            "Unknown ident",
+            SimpleSpan {
+                start: span.start,
+                end: span.end,
+                context: (),
+            },
+            "Failed to evaluate expression as number",
+        )),
+    }
+}
+
+fn eval_as_range(
+    ast: Expression,
+    span: Range<usize>,
+    env: &HashMap<String, Value>,
+) -> Result<(Option<usize>, Option<usize>), Error<'static>> {
+    let value = compile_ast(ast, env)?;
+    match value {
+        Value::Range {
+            start,
+            end,
+            is_inclusive,
+        } => Ok((
+            start.map(|x| x as usize),
+            end.map(|x| x as usize + usize::from(is_inclusive) - 1),
+        )),
+        _ => Err(Error::custom(
+            SimpleSpan {
+                start: span.start,
+                end: span.end,
+                context: (),
+            },
+            "Failed to evaluate expression as range",
         )),
     }
 }
@@ -87,9 +121,17 @@ fn compile_ast(ast: Expression, env: &HashMap<String, Value>) -> Result<Value, E
                 )
             })?
             .clone()),
-        Expression::Array { element } => Ok(Value::from_validator(ArrayValidator(
-            eval_as_validator(*element, env)?,
-        ))),
+        Expression::Array { element, index } => {
+            let (start, end) = match index {
+                Some(e) => eval_as_range(*e.value, e.span, env)?,
+                None => (None, None),
+            };
+            Ok(Value::from_validator(ArrayValidator(
+                eval_as_validator(*element, env)?,
+                start,
+                end,
+            )))
+        }
         Expression::Object(record_matchers) => Ok(Value::from_validator(ObjectValidator(
             record_matchers
                 .into_iter()
