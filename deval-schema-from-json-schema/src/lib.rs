@@ -13,6 +13,10 @@ struct JsonSchema {
     items: Option<Box<JsonSchema>>,
     min_items: Option<i32>,
     max_items: Option<i32>,
+    minimum: Option<f64>,
+    maximum: Option<f64>,
+    #[serde(default)]
+    exclusive_maximum: bool,
     additional_properties: Option<AdditionalProperties>,
     description: Option<String>,
     #[serde(flatten)]
@@ -49,6 +53,22 @@ fn convert_json_type(type_str: &str) -> String {
     }
 }
 
+fn convert_number_range(
+    base_type: &str,
+    minimum: Option<f64>,
+    maximum: Option<f64>,
+    exclusive_maximum: bool,
+) -> String {
+    match (minimum, maximum, exclusive_maximum) {
+        (None, None, _) => base_type.to_string(),
+        (None, Some(max), false) => format!("..={max}"),
+        (None, Some(max), true) => format!("..{max}"),
+        (Some(min), None, _) => format!("{min}.."),
+        (Some(min), Some(max), false) => format!("{min}..={max}"),
+        (Some(min), Some(max), true) => format!("{min}..{max}"),
+    }
+}
+
 fn convert_object_properties(schema: &JsonSchema) -> String {
     let mut fields = Vec::new();
 
@@ -57,7 +77,7 @@ fn convert_object_properties(schema: &JsonSchema) -> String {
 
     for (key, prop_schema) in &schema.properties {
         let field_type = json_schema_to_deval(prop_schema);
-        
+
         // Determine if the field is optional (not in required list)
         let is_optional = !required.contains(key);
         let field_name = if is_optional {
@@ -75,7 +95,7 @@ fn convert_object_properties(schema: &JsonSchema) -> String {
 
         fields.push(format!("{}{}: {}", doc_comment, field_name, field_type));
     }
-    
+
     // Check if the object allows additional properties
     let allows_additional = match &schema.additional_properties {
         Some(additional) => {
@@ -85,7 +105,7 @@ fn convert_object_properties(schema: &JsonSchema) -> String {
                 // If additionalProperties is true or a schema, additional properties are allowed
                 AdditionalProperties::Boolean(true) | AdditionalProperties::Schema(_) => true,
             }
-        },
+        }
         // If additionalProperties is not specified, it defaults to true
         None => true,
     };
@@ -125,6 +145,12 @@ fn json_schema_to_deval(schema: &JsonSchema) -> String {
                     }
                 }
                 "object" => convert_object_properties(schema),
+                "number" | "integer" => convert_number_range(
+                    type_str,
+                    schema.minimum,
+                    schema.maximum,
+                    schema.exclusive_maximum,
+                ),
                 _ => convert_json_type(type_str),
             },
             JsonSchemaType::Multiple(type_array) => {
@@ -140,6 +166,12 @@ fn json_schema_to_deval(schema: &JsonSchema) -> String {
                             }
                         }
                         "object" => convert_object_properties(schema),
+                        "number" | "integer" => convert_number_range(
+                            type_str,
+                            schema.minimum,
+                            schema.maximum,
+                            schema.exclusive_maximum,
+                        ),
                         _ => convert_json_type(type_str),
                     })
                     .collect();
@@ -151,6 +183,14 @@ fn json_schema_to_deval(schema: &JsonSchema) -> String {
                 }
             }
         }
+    } else if schema.minimum.is_some() || schema.maximum.is_some() {
+        // Handle number constraints without explicit type
+        convert_number_range(
+            "number",
+            schema.minimum,
+            schema.maximum,
+            schema.exclusive_maximum,
+        )
     } else if !schema.properties.is_empty() {
         // Object without explicit type
         convert_object_properties(schema)
@@ -188,10 +228,59 @@ mod tests {
     }
 
     #[test]
-    fn test_single_type() {
-        let json_schema = r#"{"type": "string"}"#;
+    fn test_number_range_minimum_only() {
+        let json_schema = r#"{"type": "number", "minimum": 5}"#;
         let result = convert(json_schema);
-        assert_eq!(result, "string");
+        assert_eq!(result, "5..");
+    }
+
+    #[test]
+    fn test_integer_range_maximum_only() {
+        let json_schema = r#"{"type": "integer", "maximum": 10}"#;
+        let result = convert(json_schema);
+        assert_eq!(result, "..=10");
+    }
+
+    #[test]
+    fn test_number_range_both() {
+        let json_schema = r#"{"type": "number", "minimum": 3, "maximum": 7}"#;
+        let result = convert(json_schema);
+        assert_eq!(result, "3..=7");
+    }
+
+    #[test]
+    fn test_integer_range_both() {
+        let json_schema = r#"{"type": "integer", "minimum": 1, "maximum": 5}"#;
+        let result = convert(json_schema);
+        assert_eq!(result, "1..=5");
+    }
+
+    #[test]
+    fn test_number_no_range() {
+        let json_schema = r#"{"type": "number"}"#;
+        let result = convert(json_schema);
+        assert_eq!(result, "number");
+    }
+
+    #[test]
+    fn test_max_only_no_type() {
+        let json_schema = r#"{"maximum": 3.0}"#;
+        let result = convert(json_schema);
+        assert_eq!(result, "..=3");
+    }
+
+    #[test]
+    fn test_min_only_no_type() {
+        let json_schema = r#"{"minimum": 5}"#;
+        let result = convert(json_schema);
+        assert_eq!(result, "5..");
+    }
+
+    #[test]
+    fn test_min_max_no_type() {
+        let json_schema = r#"{"minimum": 2, "maximum": 8}"#;
+        let result = convert(json_schema);
+        assert_eq!(result, "2..=8");
     }
 
     #[test]

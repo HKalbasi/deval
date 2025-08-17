@@ -23,7 +23,22 @@ impl Value {
     fn to_validator(self) -> Box<dyn Validator> {
         match self {
             Value::Number(_) => todo!(),
-            Value::Range { .. } => todo!(),
+            Value::Range {
+                start,
+                end,
+                is_inclusive,
+            } => Box::new(LambdaValidator(move |d| {
+                if !matches!(&d.value, SpannedData::Number(n) if start.is_none_or(|s| s <= n.value) && end.is_none_or(|e| n.value < e || is_inclusive && n.value == e))
+                {
+                    // TODO: bad error message
+                    Some(format!(
+                        "Expected Number in range, found {}",
+                        d.value.kind()
+                    ))
+                } else {
+                    None
+                }
+            })),
             Value::Validator(validator) => validator,
         }
     }
