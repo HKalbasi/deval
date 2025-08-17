@@ -2,7 +2,7 @@ use chumsky::prelude::*;
 use chumsky::text;
 
 use deval_schema_ast::Spanned;
-use deval_schema_ast::{DataMatcher, RecordMatcher};
+use deval_schema_ast::{Expression, RecordMatcher};
 
 pub type Error<'a> = chumsky::error::Rich<'a, char, SimpleSpan>;
 pub use chumsky::span::SimpleSpan;
@@ -16,7 +16,7 @@ fn spanned<'a, T>(
     })
 }
 
-fn parser<'a>() -> impl Parser<'a, &'a str, DataMatcher, extra::Err<Error<'a>>> {
+fn parser<'a>() -> impl Parser<'a, &'a str, Expression, extra::Err<Error<'a>>> {
     recursive(|data| {
         // Parse doc comments (/// lines)
         let doc_comment = just("///")
@@ -54,17 +54,17 @@ fn parser<'a>() -> impl Parser<'a, &'a str, DataMatcher, extra::Err<Error<'a>>> 
             )
             .padded()
             .then_ignore(just('}').padded())
-            .map(DataMatcher::Object);
+            .map(Expression::Object);
 
         // Parse basic identifiers (string, number, etc.)
-        let ident = spanned(text::ident().padded().map(String::from)).map(DataMatcher::Ident);
+        let ident = spanned(text::ident().padded().map(String::from)).map(Expression::Ident);
 
         // Parse arrays: type followed by []
         let arrayable = ident
             .or(object)
             .then(just("[]").padded().repeated().count())
             .map(|(base, brackets)| {
-                (0..brackets).fold(base, |inner, _| DataMatcher::Array {
+                (0..brackets).fold(base, |inner, _| Expression::Array {
                     element: Box::new(inner),
                 })
             });
@@ -74,11 +74,11 @@ fn parser<'a>() -> impl Parser<'a, &'a str, DataMatcher, extra::Err<Error<'a>>> 
             .separated_by(just('|').padded())
             .at_least(1)
             .collect::<Vec<_>>()
-            .map(|mut items: Vec<DataMatcher>| {
+            .map(|mut items: Vec<Expression>| {
                 if items.len() == 1 {
                     items.remove(0)
                 } else {
-                    DataMatcher::Union(items)
+                    Expression::Union(items)
                 }
             });
 
@@ -87,6 +87,6 @@ fn parser<'a>() -> impl Parser<'a, &'a str, DataMatcher, extra::Err<Error<'a>>> 
     .then_ignore(end())
 }
 
-pub fn parse(source: &str) -> Result<DataMatcher, Vec<Error<'_>>> {
+pub fn parse(source: &str) -> Result<Expression, Vec<Error<'_>>> {
     parser().parse(source).into_result()
 }

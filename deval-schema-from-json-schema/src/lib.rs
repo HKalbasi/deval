@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 
 #[derive(Debug, Deserialize, Serialize)]
-#[serde(rename_all = "kebab-case")]
+#[serde(rename_all = "camelCase")]
 struct JsonSchema {
     #[serde(rename = "type")]
     type_field: Option<JsonSchemaType>,
@@ -11,7 +11,8 @@ struct JsonSchema {
     #[serde(default)]
     required: Vec<String>,
     items: Option<Box<JsonSchema>>,
-    #[serde(rename = "additionalProperties")]
+    min_items: Option<i32>,
+    max_items: Option<i32>,
     additional_properties: Option<AdditionalProperties>,
     description: Option<String>,
     #[serde(flatten)]
@@ -111,10 +112,16 @@ fn json_schema_to_deval(schema: &JsonSchema) -> String {
         match type_field {
             JsonSchemaType::Single(type_str) => match type_str.as_str() {
                 "array" => {
+                    let len_range = match (schema.min_items, schema.max_items) {
+                        (None, None) => format!("[]"),
+                        (None, Some(r)) => format!("[..={r}]"),
+                        (Some(l), None) => format!("[{l}..]"),
+                        (Some(l), Some(r)) => format!("[{l}..={r}]"),
+                    };
                     if let Some(items) = &schema.items {
-                        format!("{}[]", json_schema_to_deval(items))
+                        format!("{}{len_range}", json_schema_to_deval(items))
                     } else {
-                        "any[]".to_string()
+                        format!("any{len_range}")
                     }
                 }
                 "object" => convert_object_properties(schema),

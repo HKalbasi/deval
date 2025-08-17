@@ -12,15 +12,21 @@ pub enum RecordMatcher {
         key: String,
         optional: bool,
         docs: String,
-        value: DataMatcher,
+        value: Expression,
     },
     AnyKey,
 }
 
 #[derive(Debug)]
-pub enum DataMatcher {
+pub enum Expression {
+    Number(Spanned<f64>),
+    Range {
+        start: Option<Spanned<Box<Expression>>>,
+        end: Option<Spanned<Box<Expression>>>,
+        is_inclusive: bool,
+    },
     Ident(Spanned<String>),
-    Array { element: Box<DataMatcher> },
+    Array { element: Box<Expression> },
     Object(Vec<RecordMatcher>),
-    Union(Vec<DataMatcher>),
+    Union(Vec<Expression>),
 }
