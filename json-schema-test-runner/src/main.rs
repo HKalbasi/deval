@@ -104,11 +104,21 @@ fn run_analysis(
     let test_files = if let Some(files) = files {
         files
     } else {
-        vec![
-            "type.json".to_string(),
-            "properties.json".to_string(),
-            "required.json".to_string(),
-        ]
+        // Get all JSON files in the draft4 test directory
+        let test_dir = "../JSON-Schema-Test-Suite/tests/draft4";
+        std::fs::read_dir(test_dir)?
+            .filter_map(|entry| {
+                entry.ok().and_then(|e| {
+                    let path = e.path();
+                    if path.extension().map_or(false, |ext| ext == "json") {
+                        path.file_name()
+                            .map(|name| name.to_string_lossy().into_owned())
+                    } else {
+                        None
+                    }
+                })
+            })
+            .collect::<Vec<_>>()
     };
 
     let mut total_passed = 0;
